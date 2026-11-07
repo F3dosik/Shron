@@ -5,15 +5,18 @@ import android.net.Uri
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.viewModelScope
 import io.github.f3dosik.shron.R
 import io.github.f3dosik.shron.ShronApplication
 import io.github.f3dosik.shron.core.GeneratedPassword
 import io.github.f3dosik.shron.core.GeneratorSettings
+import io.github.f3dosik.shron.core.ShronError
 import io.github.f3dosik.shron.mobile.Mobile
 import io.github.f3dosik.shron.mobile.SecretInput
 import io.github.f3dosik.shron.ui.common.CoreViewModel
 import io.github.f3dosik.shron.ui.common.PickedFile
 import io.github.f3dosik.shron.ui.common.readPickedFile
+import kotlinx.coroutines.launch
 
 /**
  * Форма нового секрета или изменения [existing]. Проверка полей (номер карты, срок и т.д.) —
@@ -27,6 +30,11 @@ class SecretFormViewModel(app: ShronApplication, val existing: SecretDetails? = 
     var type by mutableStateOf(Mobile.TypeCredentials)
     var name by mutableStateOf("")
     var metadata by mutableStateOf("")
+    var group by mutableStateOf("")
+
+    /** Существующие группы — подсказки к полю группы. */
+    var groups by mutableStateOf<List<String>>(emptyList())
+        private set
 
     var login by mutableStateOf("")
     var password by mutableStateOf("")
@@ -54,6 +62,7 @@ class SecretFormViewModel(app: ShronApplication, val existing: SecretDetails? = 
             type = existing.ref.type
             name = existing.ref.name
             metadata = existing.metadata
+            group = existing.group
             login = existing.login
             password = existing.password
             uris = existing.uris
@@ -62,6 +71,21 @@ class SecretFormViewModel(app: ShronApplication, val existing: SecretDetails? = 
             cardHolder = existing.cardHolder
             cardExpiry = existing.cardExpiry
             cardCvv = existing.cardCvv
+        }
+        loadGroups()
+    }
+
+    /**
+     * Подсказки загружаются отдельно от [run]: форма не блокируется на время загрузки,
+     * а без сети остаётся просто без подсказок.
+     */
+    private fun loadGroups() {
+        viewModelScope.launch {
+            groups = try {
+                groupNames(core.listSecrets().map(SecretItem::from))
+            } catch (_: ShronError) {
+                emptyList()
+            }
         }
     }
 
@@ -94,6 +118,7 @@ class SecretFormViewModel(app: ShronApplication, val existing: SecretDetails? = 
             name = this@SecretFormViewModel.name
             type = this@SecretFormViewModel.type
             metadata = this@SecretFormViewModel.metadata
+            group = this@SecretFormViewModel.group
             when (this@SecretFormViewModel.type) {
                 Mobile.TypeCredentials -> {
                     login = this@SecretFormViewModel.login

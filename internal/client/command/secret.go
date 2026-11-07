@@ -28,7 +28,7 @@ func (c *Commands) newSecretCmd() *cobra.Command {
 // newCreateCmd создаёт подкоманду создания нового секрета.
 // Тип секрета определяет, какие поля будут запрошены интерактивно.
 func (c *Commands) newCreateCmd() *cobra.Command {
-	var name, secretType string
+	var name, secretType, group string
 	var generate bool
 	var gen genFlags
 	cmd := &cobra.Command{
@@ -36,6 +36,10 @@ func (c *Commands) newCreateCmd() *cobra.Command {
 		Short: "Создать новый секрет",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			t, err := domain.ParseSecretType(secretType)
+			if err != nil {
+				return err
+			}
+			group, err := domain.NormalizeGroup(group)
 			if err != nil {
 				return err
 			}
@@ -65,6 +69,7 @@ func (c *Commands) newCreateCmd() *cobra.Command {
 				Type:     t,
 				Data:     data,
 				Metadata: metadata,
+				Group:    group,
 			}); err != nil {
 				return err
 			}
@@ -77,6 +82,7 @@ func (c *Commands) newCreateCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVar(&name, "name", "", "Имя секрета (обязательно)")
 	cmd.Flags().StringVar(&secretType, "type", "", "Тип: credentials|text|card|binary (обязательно)")
+	cmd.Flags().StringVar(&group, "group", "", "Группа секрета (по желанию)")
 	cmd.Flags().BoolVar(&generate, "generate", false, "сгенерировать пароль вместо ввода (для credentials)")
 	gen.register(cmd)
 	_ = cmd.MarkFlagRequired("name")
@@ -87,7 +93,7 @@ func (c *Commands) newCreateCmd() *cobra.Command {
 // newUpdateCmd создаёт подкоманду изменения секрета.
 // Тип секрета определяет, какие поля будут запрошены интерактивно.
 func (c *Commands) newUpdateCmd() *cobra.Command {
-	var name, secretType string
+	var name, secretType, group string
 	var generate bool
 	var gen genFlags
 	cmd := &cobra.Command{
@@ -95,6 +101,10 @@ func (c *Commands) newUpdateCmd() *cobra.Command {
 		Short: "Изменить секрет",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			t, err := domain.ParseSecretType(secretType)
+			if err != nil {
+				return err
+			}
+			group, err := domain.NormalizeGroup(group)
 			if err != nil {
 				return err
 			}
@@ -107,6 +117,16 @@ func (c *Commands) newUpdateCmd() *cobra.Command {
 			secretSvc, err := c.unlockSecretService(cmd.Context())
 			if err != nil {
 				return err
+			}
+
+			// Без --group секрет остаётся в своей группе: остальные поля вводятся
+			// заново, а группу проще не терять при каждом изменении пароля.
+			if !cmd.Flags().Changed("group") {
+				current, err := secretSvc.GetSecret(cmd.Context(), name, t)
+				if err != nil {
+					return err
+				}
+				group = current.Group
 			}
 
 			data, err := promptSecretData(t, generated)
@@ -124,6 +144,7 @@ func (c *Commands) newUpdateCmd() *cobra.Command {
 				Type:     t,
 				Data:     data,
 				Metadata: metadata,
+				Group:    group,
 			}); err != nil {
 				return err
 			}
@@ -136,6 +157,7 @@ func (c *Commands) newUpdateCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVar(&name, "name", "", "Имя секрета (обязательно)")
 	cmd.Flags().StringVar(&secretType, "type", "", "Тип: credentials|text|card|binary (обязательно)")
+	cmd.Flags().StringVar(&group, "group", "", `Группа секрета: без флага остаётся прежняя, --group "" убирает из группы`)
 	cmd.Flags().BoolVar(&generate, "generate", false, "сгенерировать пароль вместо ввода (для credentials)")
 	gen.register(cmd)
 	_ = cmd.MarkFlagRequired("name")
@@ -183,10 +205,10 @@ func (c *Commands) newGetCmd() *cobra.Command {
 }
 
 // newListCmd создаёт подкоманду вывода списка секретов пользователя.
-// Выводит таблицу с метаинформацией (имя, тип, метаданные, дата обновления), без значений секретов.
-// Поддерживает фильтрацию по типам (--type).
+// Выводит таблицу с метаинформацией (группа, имя, тип, метаданные, дата обновления), без
+// значений секретов. Поддерживает фильтрацию по типу (--type) и группе (--group).
 func (c *Commands) newListCmd() *cobra.Command {
-	var filterType string
+	var filterType, filterGroup string
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "Список секретов",
@@ -201,10 +223,11 @@ func (c *Commands) newListCmd() *cobra.Command {
 				return err
 			}
 
-			return WriteSecretList(secrets, filterType)
+			return WriteSecretList(secrets, ListFilter{Type: filterType, Group: filterGroup})
 		},
 	}
 	cmd.Flags().StringVar(&filterType, "type", "", "Фильтр по типам: credentials|text|card|binary")
+	cmd.Flags().StringVar(&filterGroup, "group", "", "Только секреты этой группы")
 	return cmd
 }
 

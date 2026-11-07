@@ -19,6 +19,8 @@ data class SecretRef(val name: String, val type: String)
 data class SecretDetails(
     val ref: SecretRef,
     val metadata: String,
+    /** Группа; пусто — без группы. */
+    val group: String = "",
     val createdAt: Long,
     val updatedAt: Long,
     val login: String = "",
@@ -36,6 +38,7 @@ data class SecretDetails(
         fun from(s: Secret) = SecretDetails(
             ref = SecretRef(s.name, s.type),
             metadata = s.metadata,
+            group = s.group,
             createdAt = s.createdAt,
             updatedAt = s.updatedAt,
             login = s.login,

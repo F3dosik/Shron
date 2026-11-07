@@ -24,7 +24,7 @@ class AutofillPickerViewModel(app: ShronApplication, keyword: String) : CoreView
     fun load() = run {
         credentials = core.listSecrets()
             .filter { it.type == Mobile.TypeCredentials }
-            .map { SecretItem(it.name, it.type, it.metadata, it.updatedAt) }
+            .map(SecretItem::from)
             .sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.name })
     }
 

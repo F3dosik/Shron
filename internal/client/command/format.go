@@ -2,9 +2,11 @@ package command
 
 import (
 	"bytes"
+	"cmp"
 	"encoding/json"
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -51,30 +53,53 @@ func WriteSecret(info *domain.SecretInfo, opts OutputOptions) error {
 	return err
 }
 
+// ListFilter — условия отбора секретов в списке; пустое поле не ограничивает.
+type ListFilter struct {
+	Type  string
+	Group string // без учёта регистра
+}
+
 // WriteSecretList выводит таблицу с метаинформацией секретов.
-// Значения не выводятся — только имя, тип, метаданные и дата обновления.
-func WriteSecretList(secrets []*domain.SecretInfo, filterType string) error {
-	if filterType != "" {
-		t, err := domain.ParseSecretType(filterType)
-		if err != nil {
+// Значения не выводятся — только группа, имя, тип, метаданные и дата обновления.
+// Секреты упорядочены по группам, секреты без группы — в конце.
+func WriteSecretList(secrets []*domain.SecretInfo, filter ListFilter) error {
+	var t domain.SecretType
+	if filter.Type != "" {
+		var err error
+		if t, err = domain.ParseSecretType(filter.Type); err != nil {
 			return err
 		}
-		filtered := make([]*domain.SecretInfo, 0, len(secrets))
-		for _, s := range secrets {
-			if s.Type == t {
-				filtered = append(filtered, s)
-			}
-		}
-		secrets = filtered
 	}
-
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	if _, err := fmt.Fprintln(w, "ИМЯ\tТИП\tМЕТАДАННЫЕ\tОБНОВЛЁН"); err != nil {
+	group, err := domain.NormalizeGroup(filter.Group)
+	if err != nil {
 		return err
 	}
+	filtered := make([]*domain.SecretInfo, 0, len(secrets))
 	for _, s := range secrets {
-		if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\n",
-			s.Name, s.Type, s.Metadata,
+		if (t == "" || s.Type == t) && (group == "" || strings.EqualFold(s.Group, group)) {
+			filtered = append(filtered, s)
+		}
+	}
+	slices.SortStableFunc(filtered, func(a, b *domain.SecretInfo) int {
+		if (a.Group == "") != (b.Group == "") {
+			if a.Group == "" {
+				return 1
+			}
+			return -1
+		}
+		return cmp.Or(
+			cmp.Compare(strings.ToLower(a.Group), strings.ToLower(b.Group)),
+			cmp.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name)),
+		)
+	})
+
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+	if _, err := fmt.Fprintln(w, "ГРУППА\tИМЯ\tТИП\tМЕТАДАННЫЕ\tОБНОВЛЁН"); err != nil {
+		return err
+	}
+	for _, s := range filtered {
+		if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
+			s.Group, s.Name, s.Type, s.Metadata,
 			s.UpdatedAt.Format("2006-01-02 15:04"),
 		); err != nil {
 			return err
@@ -88,6 +113,9 @@ func formatPretty(info *domain.SecretInfo) ([]byte, error) {
 	var buf bytes.Buffer
 	fmt.Fprintf(&buf, "Имя:        %s\n", info.Name)
 	fmt.Fprintf(&buf, "Тип:        %s\n", info.Type)
+	if info.Group != "" {
+		fmt.Fprintf(&buf, "Группа:     %s\n", info.Group)
+	}
 	if info.Metadata != "" {
 		fmt.Fprintf(&buf, "Метаданные: %s\n", info.Metadata)
 	}

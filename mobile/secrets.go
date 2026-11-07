@@ -26,9 +26,11 @@ const maxFileSize = 32 << 20
 // SecretSummary — строка списка секретов, без содержимого.
 // Время — миллисекунды Unix (0 — неизвестно), в Kotlin: Instant.ofEpochMilli.
 type SecretSummary struct {
-	Name      string
-	Type      string
-	Metadata  string
+	Name     string
+	Type     string
+	Metadata string
+	// Group — группа секрета; пусто — без группы.
+	Group     string
 	CreatedAt int64
 	UpdatedAt int64
 }
@@ -57,6 +59,7 @@ type Secret struct {
 	Name      string
 	Type      string
 	Metadata  string
+	Group     string
 	CreatedAt int64
 	UpdatedAt int64
 
@@ -84,6 +87,8 @@ type SecretInput struct {
 	Name     string
 	Type     string
 	Metadata string
+	// Group — группа секрета; пусто — без группы.
+	Group string
 
 	Login    string
 	Password string
@@ -117,6 +122,7 @@ func (a *App) ListSecrets() (*SecretList, error) {
 			Name:      s.Name,
 			Type:      string(s.Type),
 			Metadata:  s.Metadata,
+			Group:     s.Group,
 			CreatedAt: unixMilli(s.CreatedAt),
 			UpdatedAt: unixMilli(s.UpdatedAt),
 		})
@@ -201,6 +207,10 @@ func (a *App) buildPayload(input *SecretInput, update bool) (*domain.SecretPaylo
 	if err != nil {
 		return nil, err
 	}
+	group, err := domain.NormalizeGroup(input.Group)
+	if err != nil {
+		return nil, toError(err)
+	}
 
 	var data any
 	switch t {
@@ -237,7 +247,7 @@ func (a *App) buildPayload(input *SecretInput, update bool) (*domain.SecretPaylo
 	if err != nil {
 		return nil, toError(err)
 	}
-	return &domain.SecretPayload{Name: name, Type: t, Data: raw, Metadata: input.Metadata}, nil
+	return &domain.SecretPayload{Name: name, Type: t, Data: raw, Metadata: input.Metadata, Group: group}, nil
 }
 
 // binaryContent проверяет размер нового содержимого или, при изменении без нового
@@ -270,6 +280,7 @@ func toSecret(info *domain.SecretInfo) (*Secret, error) {
 		Name:      info.Name,
 		Type:      string(info.Type),
 		Metadata:  info.Metadata,
+		Group:     info.Group,
 		CreatedAt: unixMilli(info.CreatedAt),
 		UpdatedAt: unixMilli(info.UpdatedAt),
 	}

@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -142,7 +143,7 @@ func TestWriteSecretList_All(t *testing.T) {
 	}
 
 	out := captureStdout(t, func() {
-		err := command.WriteSecretList(secrets, "")
+		err := command.WriteSecretList(secrets, command.ListFilter{})
 		require.NoError(t, err)
 	})
 
@@ -159,7 +160,7 @@ func TestWriteSecretList_Filter(t *testing.T) {
 	}
 
 	out := captureStdout(t, func() {
-		err := command.WriteSecretList(secrets, "text")
+		err := command.WriteSecretList(secrets, command.ListFilter{Type: "text"})
 		require.NoError(t, err)
 	})
 
@@ -167,14 +168,36 @@ func TestWriteSecretList_Filter(t *testing.T) {
 	assert.NotContains(t, out, "creds")
 }
 
+func TestWriteSecretList_Groups(t *testing.T) {
+	secrets := []*domain.SecretInfo{
+		{SecretPayload: domain.SecretPayload{Name: "loose", Type: domain.SecretTypeText}},
+		{SecretPayload: domain.SecretPayload{Name: "mail", Type: domain.SecretTypeCredentials, Group: "Работа"}},
+		{SecretPayload: domain.SecretPayload{Name: "bank", Type: domain.SecretTypeCard, Group: "Банки"}},
+	}
+
+	out := captureStdout(t, func() {
+		require.NoError(t, command.WriteSecretList(secrets, command.ListFilter{}))
+	})
+	// По группам в алфавитном порядке, без группы — в конце.
+	assert.Less(t, strings.Index(out, "bank"), strings.Index(out, "mail"))
+	assert.Less(t, strings.Index(out, "mail"), strings.Index(out, "loose"))
+
+	out = captureStdout(t, func() {
+		require.NoError(t, command.WriteSecretList(secrets, command.ListFilter{Group: " работа "}))
+	})
+	assert.Contains(t, out, "mail")
+	assert.NotContains(t, out, "bank")
+	assert.NotContains(t, out, "loose")
+}
+
 func TestWriteSecretList_InvalidFilter(t *testing.T) {
-	err := command.WriteSecretList(nil, "bogus")
+	err := command.WriteSecretList(nil, command.ListFilter{Type: "bogus"})
 	assert.ErrorIs(t, err, domain.ErrUnknownSecretType)
 }
 
 func TestWriteSecretList_Empty(t *testing.T) {
 	out := captureStdout(t, func() {
-		err := command.WriteSecretList(nil, "")
+		err := command.WriteSecretList(nil, command.ListFilter{})
 		require.NoError(t, err)
 	})
 

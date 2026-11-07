@@ -171,6 +171,11 @@ type SecretPayload struct {
 	Type     SecretType      `json:"type"`
 	Data     json.RawMessage `json:"data"`
 	Metadata string          `json:"metadata,omitempty"`
+	// Group — группа (папка) секрета для порядка в списке; пусто — без группы.
+	// Хранится внутри зашифрованных данных, поэтому сервер о группах не знает.
+	// Название приводится к виду NormalizeGroup. Поле появилось позже остальных:
+	// клиент, который о нём не знает, при изменении секрета перезапишет его без группы.
+	Group string `json:"group,omitempty"`
 }
 
 // SecretInfo представляет секрет для отображения пользователю.

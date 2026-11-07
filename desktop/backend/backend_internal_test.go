@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/F3dosik/Shron/internal/client/vault"
@@ -125,6 +126,22 @@ func TestGenerate(t *testing.T) {
 	_, err = app.GeneratePassword(GeneratorOptions{Length: 20})
 	assert.ErrorContains(t, err, "VALIDATION")
 	_, err = app.GeneratePassphrase(2)
+	assert.ErrorContains(t, err, "VALIDATION")
+}
+
+func TestGroup_RoundTrip(t *testing.T) {
+	app := &App{}
+	p, err := app.buildPayload(SecretInput{Name: "x", Type: string(domain.SecretTypeText), Text: "t", Group: " Дом  и семья "}, false)
+	require.NoError(t, err)
+	assert.Equal(t, "Дом и семья", p.Group)
+
+	s, err := toSecret(&domain.SecretInfo{SecretPayload: *p})
+	require.NoError(t, err)
+	assert.Equal(t, "Дом и семья", s.Group)
+
+	_, err = app.buildPayload(SecretInput{
+		Name: "x", Type: string(domain.SecretTypeText), Text: "t", Group: strings.Repeat("я", domain.MaxGroupLength+1),
+	}, false)
 	assert.ErrorContains(t, err, "VALIDATION")
 }
 
