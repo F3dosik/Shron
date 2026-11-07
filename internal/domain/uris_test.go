@@ -54,3 +54,45 @@ func TestCredentialsSecret_URIsAreOptional(t *testing.T) {
 	require.NoError(t, err)
 	assert.JSONEq(t, `{"login":"me","password":"pw","uris":["github.com"]}`, string(data))
 }
+
+func TestMatchURI_Sites(t *testing.T) {
+	tests := []struct {
+		uri, site string
+		want      bool
+	}{
+		{"github.com", "github.com", true},
+		{"github.com", "gist.github.com", true},
+		{"https://github.com/login", "github.com", true},
+		{"GitHub.com", "WWW.GITHUB.COM", true},
+		{"www.github.com", "github.com", true},
+		{"https://user:pw@github.com:8443/x?y#z", "github.com", true},
+		{"github.com.", "github.com", true},
+		{"192.168.1.5", "192.168.1.5", true},
+		{"http://[::1]:8080/", "::1", true},
+		{"localhost:3000", "localhost", true},
+
+		// Фишинг и чужие домены.
+		{"github.com", "github.com.evil.ru", false},
+		{"github.com", "notgithub.com", false},
+		{"gist.github.com", "github.com", false},
+		{"com", "github.com", false},
+		{"github", "github.com", false},
+		{"", "github.com", false},
+		{"github.com", "", false},
+		{"androidapp://com.github.android", "github.com", false},
+	}
+	for _, tt := range tests {
+		assert.Equal(t, tt.want, domain.MatchURI(tt.uri, tt.site, "com.android.chrome"), "%q on %q", tt.uri, tt.site)
+	}
+}
+
+func TestMatchURI_Apps(t *testing.T) {
+	assert.True(t, domain.MatchURI("androidapp://com.github.android", "", "com.github.android"))
+	assert.True(t, domain.MatchURI("AndroidApp://Com.GitHub.Android ", "", "com.github.android"))
+	assert.False(t, domain.MatchURI("androidapp://com.github.android", "", "com.github.android.evil"))
+	assert.False(t, domain.MatchURI("androidapp://", "", ""))
+	// В браузере пакет — сам браузер, а не сайт.
+	assert.False(t, domain.MatchURI("androidapp://com.android.chrome", "github.com", "com.android.chrome"))
+	// Сайт не подходит приложению, даже если имя похоже.
+	assert.False(t, domain.MatchURI("github.com", "", "com.github.android"))
+}

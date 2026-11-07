@@ -144,3 +144,46 @@ func TestE2E_Mobile_UnlockWithKey(t *testing.T) {
 	require.NoError(t, app.Logout(false))
 	assert.Equal(t, mobile.CodeNotSignedIn, mobileCode(t, app.UnlockWithKey(key)))
 }
+
+func TestE2E_Mobile_MatchLogins(t *testing.T) {
+	app := newMobileApp(t, t.TempDir(), nil)
+	require.NoError(t, app.SaveSettings(serverAddr, "", false, 5))
+	login := "mob-match-" + uuid.NewString()
+	require.NoError(t, app.Register(login, "mobile-pass-1"))
+	_, err := app.SignIn(login, "mobile-pass-1")
+	require.NoError(t, err)
+
+	for _, s := range []*mobile.SecretInput{
+		{Name: "GitHub work", Type: mobile.TypeCredentials, Login: "work", Password: "pw-w", URIs: "github.com"},
+		{Name: "github app", Type: mobile.TypeCredentials, Login: "app", Password: "pw-a", URIs: "androidapp://com.github.android"},
+		{Name: "Bank", Type: mobile.TypeCredentials, Login: "me", Password: "pw-b", URIs: "bank.ru"},
+		{Name: "no sites", Type: mobile.TypeCredentials, Login: "x", Password: "y"},
+		{Name: "github.com", Type: mobile.TypeText, Text: "не логин"},
+	} {
+		require.NoError(t, app.SaveSecret(s, false))
+	}
+
+	names := func(list *mobile.LoginMatchList) []string {
+		var out []string
+		for i := 0; i < list.Len(); i++ {
+			out = append(out, list.Get(i).Name+"/"+list.Get(i).Login+"/"+list.Get(i).Password)
+		}
+		return out
+	}
+
+	site, err := app.MatchLogins("gist.github.com", "com.android.chrome")
+	require.NoError(t, err)
+	assert.Equal(t, []string{"GitHub work/work/pw-w"}, names(site))
+
+	native, err := app.MatchLogins("", "com.github.android")
+	require.NoError(t, err)
+	assert.Equal(t, []string{"github app/app/pw-a"}, names(native))
+
+	phishing, err := app.MatchLogins("github.com.evil.ru", "com.android.chrome")
+	require.NoError(t, err)
+	assert.Equal(t, 0, phishing.Len())
+
+	app.Lock()
+	_, err = app.MatchLogins("github.com", "com.android.chrome")
+	assert.Equal(t, mobile.CodeLocked, mobileCode(t, err))
+}

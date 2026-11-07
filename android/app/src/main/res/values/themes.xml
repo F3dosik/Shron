@@ -2,4 +2,12 @@
 <resources>
 
     <style name="Theme.Shron" parent="android:Theme.Material.Light.NoActionBar" />
+
+    <!-- Окно поверх приложения, которое заполняется: разблокировка из автозаполнения. -->
+    <style name="Theme.Shron.Translucent" parent="Theme.Shron">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:backgroundDimEnabled">false</item>
+    </style>
 </resources>

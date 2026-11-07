@@ -319,3 +319,47 @@ func unixMilli(t time.Time) int64 {
 	}
 	return t.UnixMilli()
 }
+
+// LoginMatch — логин для подсказки автозаполнения.
+type LoginMatch struct {
+	Name     string
+	Login    string
+	Password string
+}
+
+// LoginMatchList — подходящие логины: gomobile не передаёт срезы структур.
+type LoginMatchList struct {
+	items []*LoginMatch
+}
+
+// Len возвращает число логинов.
+func (l *LoginMatchList) Len() int {
+	return len(l.items)
+}
+
+// Get возвращает логин с индексом i или nil, если индекс вне списка.
+func (l *LoginMatchList) Get(i int) *LoginMatch {
+	if i < 0 || i >= len(l.items) {
+		return nil
+	}
+	return l.items[i]
+}
+
+// MatchLogins возвращает логины, привязанные к сайту webDomain (форма в браузере) или к
+// приложению packageName (webDomain пустой), — для подсказок автозаполнения. Сравнение
+// строгое: поддомены подходят, похожие домены — нет (см. domain.MatchURI).
+func (a *App) MatchLogins(webDomain, packageName string) (*LoginMatchList, error) {
+	v, err := a.currentVault()
+	if err != nil {
+		return nil, err
+	}
+	matches, err := v.MatchLogins(context.Background(), webDomain, packageName)
+	if err != nil {
+		return nil, toError(err)
+	}
+	list := &LoginMatchList{items: make([]*LoginMatch, 0, len(matches))}
+	for _, m := range matches {
+		list.items = append(list.items, &LoginMatch{Name: m.Name, Login: m.Login, Password: m.Password})
+	}
+	return list, nil
+}

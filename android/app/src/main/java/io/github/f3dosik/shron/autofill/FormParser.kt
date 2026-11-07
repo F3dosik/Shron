@@ -120,3 +120,19 @@ fun searchKeyword(webDomain: String?, packageName: String?): String {
     }
     return ""
 }
+
+/**
+ * Адрес, который привязывается к логину, выбранному для формы: домен сайта без «www.» или
+ * «androidapp://пакет» для приложения. В браузере привязывается сайт, а не сам браузер.
+ */
+fun bindingUri(webDomain: String?, packageName: String?): String? = when {
+    !webDomain.isNullOrBlank() -> webDomain.trim().lowercase().removePrefix("www.").trimEnd('.')
+    !packageName.isNullOrBlank() -> "androidapp://" + packageName.trim()
+    else -> null
+}
+
+/** Добавляет [uri] к сайтам логина (по одному на строку), если его там ещё нет. */
+fun addUri(uris: String, uri: String): String {
+    val lines = uris.lines().map(String::trim).filter(String::isNotEmpty)
+    return if (lines.any { it.equals(uri, ignoreCase = true) }) lines.joinToString("\n") else (lines + uri).joinToString("\n")
+}
