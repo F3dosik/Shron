@@ -36,8 +36,18 @@ func TestFormatPretty_Credentials(t *testing.T) {
 	s := string(out)
 	assert.Contains(t, s, "Имя:        test")
 	assert.Contains(t, s, "Метаданные: github")
+	assert.NotContains(t, s, "Группа:", "empty group should be omitted")
 	assert.Contains(t, s, "Логин:    ivan")
 	assert.Contains(t, s, "Пароль:   s3cret")
+}
+
+func TestFormatPretty_Group(t *testing.T) {
+	info := makeInfo(t, domain.SecretTypeText, domain.TextSecret{Text: "hello"}, "")
+	info.Group = "Работа"
+
+	out, err := formatPretty(info)
+	require.NoError(t, err)
+	assert.Contains(t, string(out), "Группа:     Работа")
 }
 
 func TestFormatPretty_Text(t *testing.T) {

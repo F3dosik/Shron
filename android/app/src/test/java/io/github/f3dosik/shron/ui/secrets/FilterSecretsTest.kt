@@ -5,8 +5,8 @@ import org.junit.Test
 
 class FilterSecretsTest {
 
-    private val mail = SecretItem("Почта", "credentials", "личный ящик", 0)
-    private val bank = SecretItem("Банк", "card", "зарплатная", 0)
+    private val mail = SecretItem("Почта", "credentials", "личный ящик", 0, group = "работа")
+    private val bank = SecretItem("Банк", "card", "зарплатная", 0, group = "Банки")
     private val note = SecretItem("Wi-Fi дома", "text", "", 0)
     private val all = listOf(mail, bank, note)
 
@@ -26,6 +26,24 @@ class FilterSecretsTest {
     @Test
     fun `query matches the comment`() {
         assertEquals(listOf("Банк"), names("Зарплат"))
+    }
+
+    @Test
+    fun `query matches the group`() {
+        assertEquals(listOf("Почта"), names("РАБОТ"))
+    }
+
+    @Test
+    fun `groups are sorted by name with ungrouped secrets last`() {
+        val groups = groupSecrets(listOf(note, mail, bank))
+        assertEquals(listOf("Банки", "работа", ""), groups.map { it.name })
+        assertEquals(listOf(listOf("Банк"), listOf("Почта"), listOf("Wi-Fi дома")), groups.map { g -> g.items.map { it.name } })
+    }
+
+    @Test
+    fun `group names are distinct and skip ungrouped`() {
+        val second = SecretItem("Пропуск", "text", "", 0, group = "работа")
+        assertEquals(listOf("Банки", "работа"), groupNames(listOf(note, mail, second, bank)))
     }
 
     @Test

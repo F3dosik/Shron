@@ -30,9 +30,41 @@
   let visible = $derived(
     secrets
       .filter((s) => !typeFilter || s.type === typeFilter)
-      .filter((s) => !query || s.name.toLowerCase().includes(query.toLowerCase()) || s.metadata.toLowerCase().includes(query.toLowerCase()))
+      .filter((s) => {
+        const q = query.trim().toLowerCase()
+        return !q || [s.name, s.metadata, s.group].some((v) => v.toLowerCase().includes(q))
+      })
       .sort((a, b) => a.name.localeCompare(b.name, 'ru')),
   )
+
+  // Существующие группы — подсказки в форме секрета.
+  let groups = $derived([...new Set(secrets.map((s) => s.group).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ru')))
+
+  // Видимые секреты по группам: группы по алфавиту, без группы — в конце. Пока групп
+  // нет, список остаётся плоским, без заголовков.
+  let sections = $derived.by(() => {
+    const byGroup = new Map<string, SecretSummary[]>()
+    for (const s of visible) {
+      const list = byGroup.get(s.group)
+      if (list) list.push(s)
+      else byGroup.set(s.group, [s])
+    }
+    return [...byGroup.entries()]
+      .sort(([a], [b]) => (a === '' ? 1 : b === '' ? -1 : a.localeCompare(b, 'ru')))
+      .map(([group, items]) => ({ group, items }))
+  })
+  let showHeaders = $derived(groups.length > 0)
+
+  // Свёрнутые группы — только в памяти, пока хранилище открыто. При поиске группы
+  // раскрыты, чтобы найденное не пряталось в свёрнутых.
+  let collapsed: Set<string> = $state(new Set())
+  let searching = $derived(query.trim() !== '')
+
+  function toggleGroup(group: string) {
+    const next = new Set(collapsed)
+    if (!next.delete(group)) next.add(group)
+    collapsed = next
+  }
 
   function handleError(e: unknown) {
     if (e instanceof AppError && lockedCodes.has(e.code)) {
@@ -100,20 +132,32 @@
     </div>
 
     <ul>
-      {#each visible as s (s.type + '/' + s.name)}
-        <li>
-          <button
-            class="item"
-            class:active={selected?.name === s.name && selected?.type === s.type && mode === 'view'}
-            onclick={() => { selected = { name: s.name, type: s.type }; mode = 'view' }}
-          >
-            <span class="icon">{typeIcon(s.type)}</span>
-            <span class="names">
-              <span class="name">{s.name}</span>
-              {#if s.metadata}<span class="meta">{s.metadata}</span>{/if}
-            </span>
-          </button>
-        </li>
+      {#each sections as section (section.group)}
+        {@const open = !showHeaders || searching || !collapsed.has(section.group)}
+        {#if showHeaders}
+          <li>
+            <button class="group" aria-expanded={open} disabled={searching} onclick={() => toggleGroup(section.group)}>
+              <span class="chevron" class:open>▸</span>
+              <span class="group-name">{section.group || 'Без группы'}</span>
+              <span class="count">{section.items.length}</span>
+            </button>
+          </li>
+        {/if}
+        {#each open ? section.items : [] as s (s.type + '/' + s.name)}
+          <li>
+            <button
+              class="item"
+              class:active={selected?.name === s.name && selected?.type === s.type && mode === 'view'}
+              onclick={() => { selected = { name: s.name, type: s.type }; mode = 'view' }}
+            >
+              <span class="icon">{typeIcon(s.type)}</span>
+              <span class="names">
+                <span class="name">{s.name}</span>
+                {#if s.metadata}<span class="meta">{s.metadata}</span>{/if}
+              </span>
+            </button>
+          </li>
+        {/each}
       {:else}
         <li class="empty muted">{secrets.length ? 'Ничего не найдено' : 'Секретов пока нет'}</li>
       {/each}
@@ -129,6 +173,7 @@
     {#if error}<p class="error banner">{error}</p>{/if}
     {#if mode === 'create'}
       <SecretForm
+        {groups}
         onsaved={async (name, type) => { await reload(); selected = { name, type }; mode = 'view'; showNotice('Сохранено') }}
         oncancel={() => (mode = 'view')}
         {onlocked}
@@ -136,6 +181,7 @@
     {:else if mode === 'edit' && editing}
       <SecretForm
         initial={editing}
+        {groups}
         onsaved={async (name, type) => { editing = null; await reload(); selected = { name, type }; mode = 'view'; showNotice('Сохранено') }}
         oncancel={() => { editing = null; mode = 'view' }}
         {onlocked}
@@ -207,6 +253,13 @@
   .name, .meta { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .meta { font-size: 12px; color: var(--muted); }
   .empty { padding: 16px; text-align: center; }
+  .group { display: flex; align-items: center; gap: 6px; width: 100%; margin-top: 6px; padding: 6px 10px; border: none; border-radius: 6px; background: none; font-size: 12px; font-weight: 600; color: var(--muted); text-align: left; }
+  .group:hover:not(:disabled) { background: var(--panel-2); }
+  .group:disabled { cursor: default; opacity: 1; }
+  .chevron { display: inline-block; transition: transform 0.15s; }
+  .chevron.open { transform: rotate(90deg); }
+  .group-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .count { font-weight: 400; }
   footer { display: flex; gap: 8px; padding: 12px; border-top: 1px solid var(--border); }
   .account { flex: 1; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .placeholder { display: flex; align-items: center; justify-content: center; height: 100%; }

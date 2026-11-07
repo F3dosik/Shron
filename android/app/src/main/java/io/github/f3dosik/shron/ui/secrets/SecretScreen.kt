@@ -134,8 +134,10 @@ private fun SecretFields(vm: SecretViewModel, secret: SecretDetails) {
         ActivityResultContracts.CreateDocument("application/octet-stream"),
     ) { uri -> if (uri != null) vm.saveFile(context.contentResolver, uri) }
 
-    typeLabel(secret.ref.type)?.let {
-        Text(stringResource(it), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+    val type = typeLabel(secret.ref.type)?.let { stringResource(it) }
+    val heading = listOfNotNull(type, secret.group.ifBlank { null }).joinToString(" · ")
+    if (heading.isNotEmpty()) {
+        Text(heading, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
     }
 
     when (secret.ref.type) {

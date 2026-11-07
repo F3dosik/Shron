@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -159,6 +160,10 @@ func TestBuildPayload(t *testing.T) {
 	require.NoError(t, err)
 	assert.JSONEq(t, `{"login":"me","password":"pw","uris":["github.com","androidapp://com.github.android"]}`, string(p.Data))
 
+	p, err = app.buildPayload(&SecretInput{Name: "x", Type: TypeText, Text: "t", Group: "  Работа \n почта "}, false)
+	require.NoError(t, err)
+	assert.Equal(t, "Работа почта", p.Group)
+
 	p, err = app.buildPayload(&SecretInput{Name: "key", Type: TypeBinary, FileData: []byte{0, 255}}, false)
 	require.NoError(t, err)
 	assert.JSONEq(t, `{"data":"AP8="}`, string(p.Data))
@@ -171,6 +176,7 @@ func TestBuildPayload(t *testing.T) {
 		{Name: "x", Type: TypeCard, CardNumber: "1234", CardHolder: "X", CardExpiry: "12/30", CardCVV: "123"},
 		{Name: "x", Type: TypeBinary},
 		{Name: "x", Type: TypeBinary, FileData: make([]byte, maxFileSize+1)},
+		{Name: "x", Type: TypeText, Text: "t", Group: strings.Repeat("я", domain.MaxGroupLength+1)},
 	} {
 		_, err := app.buildPayload(bad, false)
 		assert.Equal(t, CodeValidation, decodeError(t, err).Code, "%+v", bad.Name+"/"+bad.Type)
@@ -181,14 +187,14 @@ func TestToSecret(t *testing.T) {
 	created := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
 	s, err := toSecret(&domain.SecretInfo{
 		SecretPayload: domain.SecretPayload{
-			Name: "visa", Type: domain.SecretTypeCard, Metadata: "m",
+			Name: "visa", Type: domain.SecretTypeCard, Metadata: "m", Group: "Банки",
 			Data: json.RawMessage(`{"number":"4111","holder":"H","expiry":"12/30","cvv":"123"}`),
 		},
 		CreatedAt: created,
 	})
 	require.NoError(t, err)
 	assert.Equal(t, &Secret{
-		Name: "visa", Type: TypeCard, Metadata: "m", CreatedAt: created.UnixMilli(),
+		Name: "visa", Type: TypeCard, Metadata: "m", Group: "Банки", CreatedAt: created.UnixMilli(),
 		CardNumber: "4111", CardHolder: "H", CardExpiry: "12/30", CardCVV: "123",
 	}, s)
 

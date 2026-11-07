@@ -93,7 +93,9 @@
   {:else}
     <header>
       <div>
-        <div class="type muted">{typeIcon(secret.type)} {typeLabel(secret.type)}</div>
+        <div class="type muted">
+          {typeIcon(secret.type)} {typeLabel(secret.type)}{#if secret.group}&nbsp;· 📁 {secret.group}{/if}
+        </div>
         <h2>{secret.name}</h2>
       </div>
       <span class="spacer"></span>

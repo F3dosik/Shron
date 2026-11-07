@@ -7,7 +7,11 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuAnchorType
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -17,9 +21,14 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -83,6 +92,8 @@ fun SecretFormScreen(vm: SecretFormViewModel, onSaved: (SecretRef) -> Unit, onCl
             Mobile.TypeBinary -> FileField(vm, enabled)
         }
 
+        GroupField(vm, enabled)
+
         TextInput(
             value = vm.metadata,
             onValueChange = { vm.metadata = it },
@@ -95,6 +106,46 @@ fun SecretFormScreen(vm: SecretFormViewModel, onSaved: (SecretRef) -> Unit, onCl
         PrimaryButton(stringResource(R.string.save), busy = vm.busy) { vm.save(onSaved) }
         TextButton(onClick = onClose, enabled = enabled, modifier = Modifier.fillMaxWidth()) {
             Text(stringResource(R.string.cancel))
+        }
+    }
+}
+
+/** Группа: свободный ввод с подсказками из существующих групп. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun GroupField(vm: SecretFormViewModel, enabled: Boolean) {
+    var expanded by remember { mutableStateOf(false) }
+    val suggestions = vm.groups.filter { it.contains(vm.group.trim(), ignoreCase = true) && it != vm.group }
+    ExposedDropdownMenuBox(expanded = expanded && suggestions.isNotEmpty(), onExpandedChange = { expanded = it }) {
+        OutlinedTextField(
+            value = vm.group,
+            onValueChange = {
+                vm.group = it
+                expanded = true
+            },
+            label = { Text(stringResource(R.string.secret_group)) },
+            supportingText = { Text(stringResource(R.string.secret_group_hint)) },
+            trailingIcon = if (vm.groups.isNotEmpty()) {
+                { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded && suggestions.isNotEmpty()) }
+            } else null,
+            enabled = enabled,
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Next),
+            modifier = Modifier
+                .fillMaxWidth()
+                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable, enabled),
+        )
+        ExposedDropdownMenu(expanded = expanded && suggestions.isNotEmpty(), onDismissRequest = { expanded = false }) {
+            suggestions.forEach { group ->
+                DropdownMenuItem(
+                    text = { Text(group) },
+                    onClick = {
+                        vm.group = group
+                        expanded = false
+                    },
+                    contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding,
+                )
+            }
         }
     }
 }

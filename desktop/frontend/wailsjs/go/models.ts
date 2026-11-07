@@ -120,6 +120,7 @@ export namespace backend {
 	    name: string;
 	    type: string;
 	    metadata: string;
+	    group: string;
 	    createdAt: string;
 	    updatedAt: string;
 	    login: string;
@@ -141,6 +142,7 @@ export namespace backend {
 	        this.name = source["name"];
 	        this.type = source["type"];
 	        this.metadata = source["metadata"];
+	        this.group = source["group"];
 	        this.createdAt = source["createdAt"];
 	        this.updatedAt = source["updatedAt"];
 	        this.login = source["login"];
@@ -158,6 +160,7 @@ export namespace backend {
 	    name: string;
 	    type: string;
 	    metadata: string;
+	    group: string;
 	    login: string;
 	    password: string;
 	    uris: string;
@@ -177,6 +180,7 @@ export namespace backend {
 	        this.name = source["name"];
 	        this.type = source["type"];
 	        this.metadata = source["metadata"];
+	        this.group = source["group"];
 	        this.login = source["login"];
 	        this.password = source["password"];
 	        this.uris = source["uris"];
@@ -192,6 +196,7 @@ export namespace backend {
 	    name: string;
 	    type: string;
 	    metadata: string;
+	    group: string;
 	    createdAt: string;
 	    updatedAt: string;
 	
@@ -204,6 +209,7 @@ export namespace backend {
 	        this.name = source["name"];
 	        this.type = source["type"];
 	        this.metadata = source["metadata"];
+	        this.group = source["group"];
 	        this.createdAt = source["createdAt"];
 	        this.updatedAt = source["updatedAt"];
 	    }

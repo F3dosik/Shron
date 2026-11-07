@@ -146,6 +146,11 @@
     <string name="secret_new_title">Новый секрет</string>
     <string name="secret_name">Название</string>
     <string name="secret_name_hint">Например, почта или банк</string>
+    <string name="secret_group">Группа</string>
+    <string name="secret_group_hint">Необязательно; секреты одной группы идут в списке вместе</string>
+    <string name="group_none">Без группы</string>
+    <string name="group_expand">Развернуть группу</string>
+    <string name="group_collapse">Свернуть группу</string>
     <string name="secret_metadata">Комментарий</string>
     <string name="secret_metadata_hint">Необязательно; показывается в списке секретов</string>
     <string name="secret_login">Логин</string>

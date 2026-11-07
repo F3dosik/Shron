@@ -79,6 +79,8 @@ func toUIError(err error) error {
 		code, message = CodeValidation, "CVV — 3 или 4 цифры"
 	case errors.Is(err, domain.ErrInvalidCardHolder):
 		code, message = CodeValidation, "Укажите держателя карты"
+	case errors.Is(err, domain.ErrGroupTooLong):
+		code, message = CodeValidation, fmt.Sprintf("Название группы — не длиннее %d символов", domain.MaxGroupLength)
 	case !ok:
 		message = err.Error()
 	}

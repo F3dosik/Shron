@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -16,6 +17,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.filled.AddCircle
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
@@ -30,6 +33,7 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -43,6 +47,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.f3dosik.shron.R
 import io.github.f3dosik.shron.mobile.Mobile
@@ -129,9 +134,22 @@ fun SecretsScreen(
                             )
                         }
                     }
-                    items(items, key = { it.type + "/" + it.name }) { item ->
-                        SecretRow(item, onClick = { onOpen(SecretRef(item.name, item.type)) })
-                        HorizontalDivider()
+                    // Пока групп нет, список плоский, без заголовков. При поиске группы
+                    // раскрыты, чтобы найденное не пряталось в свёрнутых.
+                    val headers = all.any { it.group.isNotEmpty() }
+                    val searching = vm.query.isNotBlank()
+                    groupSecrets(items).forEach { group ->
+                        val expanded = !headers || searching || group.name !in vm.collapsed
+                        if (headers) {
+                            stickyHeader(key = "group/" + group.name) {
+                                GroupHeader(group, expanded, enabled = !searching, onClick = { vm.toggleGroup(group.name) })
+                            }
+                        }
+                        if (!expanded) return@forEach
+                        items(group.items, key = { it.type + "/" + it.name }) { item ->
+                            SecretRow(item, onClick = { onOpen(SecretRef(item.name, item.type)) })
+                            HorizontalDivider()
+                        }
                     }
                 }
             }
@@ -168,6 +186,43 @@ private fun SearchBar(vm: SecretsViewModel) {
                     label = { Text(stringResource(typeLabel(type)!!)) },
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun GroupHeader(group: SecretGroup, expanded: Boolean, enabled: Boolean, onClick: () -> Unit) {
+    val name = group.name.ifEmpty { stringResource(R.string.group_none) }
+    val action = stringResource(if (expanded) R.string.group_collapse else R.string.group_expand)
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(enabled = enabled, onClickLabel = action, onClick = onClick),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+        ) {
+            Icon(
+                if (expanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+            )
+            Text(
+                name,
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.primary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                group.items.size.toString(),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }

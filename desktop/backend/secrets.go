@@ -21,6 +21,7 @@ type SecretSummary struct {
 	Name      string `json:"name"`
 	Type      string `json:"type"`
 	Metadata  string `json:"metadata"`
+	Group     string `json:"group"`
 	CreatedAt string `json:"createdAt"`
 	UpdatedAt string `json:"updatedAt"`
 }
@@ -30,6 +31,7 @@ type Secret struct {
 	Name      string `json:"name"`
 	Type      string `json:"type"`
 	Metadata  string `json:"metadata"`
+	Group     string `json:"group"`
 	CreatedAt string `json:"createdAt"`
 	UpdatedAt string `json:"updatedAt"`
 
@@ -55,6 +57,7 @@ type SecretInput struct {
 	Name     string `json:"name"`
 	Type     string `json:"type"`
 	Metadata string `json:"metadata"`
+	Group    string `json:"group"`
 
 	Login    string `json:"login"`
 	Password string `json:"password"`
@@ -95,6 +98,7 @@ func (a *App) ListSecrets() ([]SecretSummary, error) {
 			Name:      s.Name,
 			Type:      string(s.Type),
 			Metadata:  s.Metadata,
+			Group:     s.Group,
 			CreatedAt: formatTime(s.CreatedAt),
 			UpdatedAt: formatTime(s.UpdatedAt),
 		})
@@ -199,6 +203,10 @@ func (a *App) buildPayload(input SecretInput, update bool) (*domain.SecretPayloa
 	if err != nil {
 		return nil, validationError("Неизвестный тип секрета")
 	}
+	group, err := domain.NormalizeGroup(input.Group)
+	if err != nil {
+		return nil, toUIError(err)
+	}
 
 	var data any
 	switch t {
@@ -235,7 +243,7 @@ func (a *App) buildPayload(input SecretInput, update bool) (*domain.SecretPayloa
 	if err != nil {
 		return nil, toUIError(err)
 	}
-	return &domain.SecretPayload{Name: name, Type: t, Data: raw, Metadata: input.Metadata}, nil
+	return &domain.SecretPayload{Name: name, Type: t, Data: raw, Metadata: input.Metadata, Group: group}, nil
 }
 
 // binaryContent читает выбранный файл или, при изменении без нового файла, берёт
@@ -280,6 +288,7 @@ func toSecret(info *domain.SecretInfo) (*Secret, error) {
 		Name:      info.Name,
 		Type:      string(info.Type),
 		Metadata:  info.Metadata,
+		Group:     info.Group,
 		CreatedAt: formatTime(info.CreatedAt),
 		UpdatedAt: formatTime(info.UpdatedAt),
 	}

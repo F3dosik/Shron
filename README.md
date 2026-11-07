@@ -72,11 +72,13 @@ shron auth delete-account          # удалить учётку со всеми
 # секреты: --type credentials | text | card | binary
 shron secret create --name gmail --type credentials
 shron secret create --name gmail --type credentials --generate   # сгенерировать пароль
+shron secret create --name gmail --type credentials --group Почта # в группу
 shron secret get    --name gmail --type credentials [--json]
 shron secret get    --name key   --type binary --output ./key.bin
-shron secret update --name gmail --type credentials
+shron secret update --name gmail --type credentials               # группа остаётся прежней
+shron secret update --name gmail --type credentials --group ""    # убрать из группы
 shron secret delete --name gmail --type credentials
-shron secret list [--type card]
+shron secret list [--type card] [--group Почта]
 
 # генератор (на клиенте, никуда не отправляется)
 shron generate                     # 20 символов

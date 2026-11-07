@@ -9,11 +9,13 @@
   // поэтому при изменении они не редактируются.
   let {
     initial = null,
+    groups = [],
     onsaved,
     oncancel,
     onlocked,
   }: {
     initial?: Secret | null
+    groups?: string[]
     onsaved: (name: string, type: string) => void
     oncancel: () => void
     onlocked: () => void
@@ -25,6 +27,7 @@
   let name = $state(start?.name ?? '')
   let type = $state(start?.type ?? 'credentials')
   let metadata = $state(start?.metadata ?? '')
+  let group = $state(start?.group ?? '')
   let login = $state(start?.login ?? '')
   let password = $state(start?.password ?? '')
   let uris = $state(start?.uris ?? '')
@@ -58,7 +61,7 @@
     try {
       await api.saveSecret(
         {
-          name, type, metadata, login, password, uris, text,
+          name, type, metadata, group, login, password, uris, text,
           cardNumber, cardHolder, cardExpiry, cardCvv,
           filePath: file?.path ?? '',
         },
@@ -130,6 +133,14 @@
     </div>
     <p class="muted" style="margin: 0; font-size: 12px">Сервер принимает файлы примерно до 750 КБ.</p>
   {/if}
+
+  <label>
+    <span>Группа (необязательно)</span>
+    <input bind:value={group} list="secret-groups" placeholder="Например, Работа" autocomplete="off" spellcheck="false" />
+    <datalist id="secret-groups">
+      {#each groups as g}<option value={g}></option>{/each}
+    </datalist>
+  </label>
 
   <label><span>Комментарий (необязательно)</span><input bind:value={metadata} autocomplete="off" /></label>
 

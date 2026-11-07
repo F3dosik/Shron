@@ -77,6 +77,7 @@ type SecretSummary struct {
 	Name      string
 	Type      domain.SecretType
 	Metadata  string
+	Group     string
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }
@@ -255,6 +256,7 @@ func (v *Vault) ListSecrets(ctx context.Context) ([]SecretSummary, error) {
 				Name:      info.Name,
 				Type:      info.Type,
 				Metadata:  info.Metadata,
+				Group:     info.Group,
 				CreatedAt: info.CreatedAt,
 				UpdatedAt: info.UpdatedAt,
 			})
