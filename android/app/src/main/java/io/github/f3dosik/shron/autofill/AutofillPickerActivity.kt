@@ -9,11 +9,11 @@ import android.view.WindowManager
 import android.view.autofill.AutofillId
 import android.view.autofill.AutofillManager
 import android.view.autofill.AutofillValue
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.annotation.RequiresApi
 import androidx.core.content.IntentCompat
+import androidx.fragment.app.FragmentActivity
 import io.github.f3dosik.shron.MainActivity
 import io.github.f3dosik.shron.ShronApplication
 import io.github.f3dosik.shron.autofill.ShronAutofillService.Companion.setValueCompat
@@ -25,7 +25,7 @@ import io.github.f3dosik.shron.ui.theme.ShronTheme
  * Возвращает Dataset с логином и паролем выбранного секрета; отмена — ничего не заполняет.
  */
 @RequiresApi(Build.VERSION_CODES.O)
-class AutofillPickerActivity : ComponentActivity() {
+class AutofillPickerActivity : FragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

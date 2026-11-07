@@ -71,6 +71,18 @@
     <string name="locked_background">Заблокировано, пока приложение было свёрнуто.</string>
     <string name="account_label">Учётка: %1$s</string>
     <string name="unlock">Разблокировать</string>
+    <string name="biometric_unlock">Разблокировать по отпечатку</string>
+    <string name="biometric_unlock_title">Разблокировка Shron</string>
+    <string name="biometric_enable_title">Вход по отпечатку в Shron</string>
+    <string name="biometric_use_password">Ввести пароль</string>
+    <string name="biometric_failed">Не удалось проверить отпечаток — введите мастер-пароль</string>
+    <string name="biometric_invalidated">Отпечатки на телефоне изменились. Введите мастер-пароль и снова включите вход по отпечатку в настройках учётки.</string>
+    <string name="biometric_section">Вход по отпечатку</string>
+    <string name="biometric_switch">Разблокировать по отпечатку или лицу</string>
+    <string name="biometric_hint">Мастер-ключ хранится на телефоне в защищённом хранилище и открывается только отпечатком. Тот, кто знает PIN телефона и сможет приложить ваш палец, откроет хранилище. При утере телефона смените мастер-пароль: прежний ключ перестанет действовать.</string>
+    <string name="biometric_unavailable">На телефоне нет надёжной биометрии или не добавлен отпечаток.</string>
+    <string name="biometric_enabled">Вход по отпечатку включён</string>
+    <string name="password_changed_biometric_off">Пароль изменён. Вход по отпечатку выключен — включите его снова.</string>
 
     <!-- Смена временного пароля -->
     <string name="password_change_title">Новый мастер-пароль</string>

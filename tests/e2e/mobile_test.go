@@ -101,3 +101,46 @@ func TestE2E_Mobile_FullFlow(t *testing.T) {
 	require.NoError(t, restarted.Logout(false))
 	assert.Empty(t, restarted.GetState().Login)
 }
+
+func TestE2E_Mobile_UnlockWithKey(t *testing.T) {
+	app := newMobileApp(t, t.TempDir(), nil)
+	require.NoError(t, app.SaveSettings(serverAddr, "", false, 5))
+
+	login := "mob-key-" + uuid.NewString()
+	require.NoError(t, app.Register(login, "mobile-pass-1"))
+	_, err := app.SignIn(login, "mobile-pass-1")
+	require.NoError(t, err)
+	require.NoError(t, app.SaveSecret(&mobile.SecretInput{Name: "note", Type: mobile.TypeText, Text: "hello"}, false))
+
+	key, err := app.MasterKey()
+	require.NoError(t, err)
+	require.Len(t, key, 32)
+
+	// Заблокированное хранилище ключ не отдаёт, а сохранённым ключом открывается.
+	app.Lock()
+	_, err = app.MasterKey()
+	assert.Equal(t, mobile.CodeLocked, mobileCode(t, err))
+	require.NoError(t, app.UnlockWithKey(key))
+	assert.True(t, app.GetState().Unlocked)
+	note, err := app.GetSecret("note", mobile.TypeText)
+	require.NoError(t, err)
+	assert.Equal(t, "hello", note.Text)
+
+	// Чужой ключ сервер не принимает, хранилище остаётся заблокированным.
+	wrong := make([]byte, len(key))
+	assert.Equal(t, mobile.CodeKeyRejected, mobileCode(t, app.UnlockWithKey(wrong)))
+	assert.False(t, app.GetState().Unlocked)
+
+	// После смены пароля прежний ключ не годится.
+	_, err = app.SignIn(login, "mobile-pass-1")
+	require.NoError(t, err)
+	require.NoError(t, app.ChangePassword("mobile-pass-1", "mobile-pass-2", 3, 64))
+	app.Lock()
+	assert.Equal(t, mobile.CodeKeyRejected, mobileCode(t, app.UnlockWithKey(key)))
+
+	// Без учётки разблокировать нечего.
+	_, err = app.SignIn(login, "mobile-pass-2")
+	require.NoError(t, err)
+	require.NoError(t, app.Logout(false))
+	assert.Equal(t, mobile.CodeNotSignedIn, mobileCode(t, app.UnlockWithKey(key)))
+}

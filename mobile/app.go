@@ -240,6 +240,30 @@ func (a *App) Unlock(password string) error {
 	return toError(v.Unlock(context.Background(), password))
 }
 
+// UnlockWithKey разблокирует хранилище текущей учётки мастер-ключом, полученным раньше
+// из MasterKey (на Android — расшифрованным ключом Keystore после биометрии). Нужен
+// сервер: по ключу выполняется вход. Ошибка CodeKeyRejected — пароль сменили, ключ
+// больше не годится: его нужно удалить и разблокировать паролем.
+func (a *App) UnlockWithKey(masterKey []byte) error {
+	v, err := a.currentVault()
+	if err != nil {
+		return err
+	}
+	return toError(v.UnlockWithKey(context.Background(), masterKey))
+}
+
+// MasterKey возвращает мастер-ключ разблокированного хранилища, чтобы сохранить его для
+// UnlockWithKey. Хранить его можно только зашифрованным ключом Keystore, а копию в
+// памяти стереть сразу после шифрования.
+func (a *App) MasterKey() ([]byte, error) {
+	v, err := a.currentVault()
+	if err != nil {
+		return nil, err
+	}
+	key, err := v.MasterKey()
+	return key, toError(err)
+}
+
 // AcceptKDFChange забывает запомненные на устройстве параметры Argon2id учётки login.
 // Вызывается после ошибки CodeKDFDowngrade, когда пользователь подтвердил, что сам сменил
 // пароль с более слабыми параметрами на другом устройстве; затем вход нужно повторить.

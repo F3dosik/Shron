@@ -2,13 +2,14 @@ package io.github.f3dosik.shron
 
 import android.os.Bundle
 import android.view.WindowManager
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.fragment.app.FragmentActivity
 import io.github.f3dosik.shron.ui.ShronRoot
 import io.github.f3dosik.shron.ui.theme.ShronTheme
 
-class MainActivity : ComponentActivity() {
+// FragmentActivity, а не ComponentActivity: его требует BiometricPrompt.
+class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // Секреты не должны попадать на скриншоты, запись экрана и миниатюру в «Недавних».

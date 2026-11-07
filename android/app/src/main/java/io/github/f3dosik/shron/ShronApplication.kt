@@ -9,6 +9,7 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import io.github.f3dosik.shron.core.AppPreferences
 import io.github.f3dosik.shron.core.BackgroundLock
+import io.github.f3dosik.shron.core.BiometricUnlock
 import io.github.f3dosik.shron.core.SecureClipboard
 import io.github.f3dosik.shron.core.ShronCore
 
@@ -22,6 +23,8 @@ class ShronApplication : Application() {
     val clipboard: SecureClipboard by lazy { SecureClipboard(this) }
 
     val preferences: AppPreferences by lazy { AppPreferences(this) }
+
+    val biometric: BiometricUnlock by lazy { BiometricUnlock(this) }
 
     val backgroundLock = BackgroundLock(
         // elapsedRealtime идёт и во сне устройства, в отличие от uptimeMillis.

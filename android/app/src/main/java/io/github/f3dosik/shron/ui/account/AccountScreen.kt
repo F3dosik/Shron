@@ -21,6 +21,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -32,6 +33,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
@@ -43,6 +45,8 @@ import io.github.f3dosik.shron.ui.common.PasswordInput
 import io.github.f3dosik.shron.ui.common.PrimaryButton
 import io.github.f3dosik.shron.ui.common.StrengthMessage
 import io.github.f3dosik.shron.ui.common.TextInput
+import io.github.f3dosik.shron.ui.common.rememberBiometricPrompter
+import io.github.f3dosik.shron.ui.common.rememberExternalActivity
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -82,6 +86,9 @@ fun AccountScreen(vm: AccountViewModel, login: String, onBack: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             ChangePasswordSection(vm, enabled)
+
+            HorizontalDivider()
+            BiometricSection(vm, enabled)
 
             HorizontalDivider()
             Text(stringResource(R.string.sessions_section), style = MaterialTheme.typography.titleMedium)
@@ -136,6 +143,39 @@ fun AccountScreen(vm: AccountViewModel, login: String, onBack: () -> Unit) {
             vm.resetDeleteForm()
         })
     }
+}
+
+@Composable
+private fun BiometricSection(vm: AccountViewModel, enabled: Boolean) {
+    val prompter = rememberBiometricPrompter()
+    val pauseLock = rememberExternalActivity()
+    val title = stringResource(R.string.biometric_enable_title)
+    val available = vm.biometricAvailable
+
+    Text(stringResource(R.string.biometric_section), style = MaterialTheme.typography.titleMedium)
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(stringResource(R.string.biometric_switch), modifier = Modifier.weight(1f))
+        Switch(
+            checked = vm.biometricEnabled,
+            onCheckedChange = { on ->
+                if (!on) {
+                    vm.disableBiometric()
+                } else {
+                    vm.biometricEnrollCipher()?.let { cipher ->
+                        // Запрос биометрии может увести приложение в фон на некоторых телефонах.
+                        pauseLock()
+                        prompter.authenticate(title, null, cipher, onSuccess = vm::enableBiometric, onError = vm::biometricError)
+                    }
+                }
+            },
+            enabled = enabled && (available || vm.biometricEnabled),
+        )
+    }
+    Text(
+        stringResource(if (available || vm.biometricEnabled) R.string.biometric_hint else R.string.biometric_unavailable),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
 }
 
 @Composable

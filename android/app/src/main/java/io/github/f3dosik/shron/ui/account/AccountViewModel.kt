@@ -8,6 +8,8 @@ import io.github.f3dosik.shron.ShronApplication
 import io.github.f3dosik.shron.core.GeneratedPassword
 import io.github.f3dosik.shron.core.GeneratorSettings
 import io.github.f3dosik.shron.ui.common.CoreViewModel
+import java.security.GeneralSecurityException
+import javax.crypto.Cipher
 
 /** Учётка: смена мастер-пароля, выход на всех устройствах, удаление учётки. */
 class AccountViewModel(app: ShronApplication) : CoreViewModel(app) {
@@ -31,6 +33,55 @@ class AccountViewModel(app: ShronApplication) : CoreViewModel(app) {
 
     var notice by mutableStateOf<String?>(null)
         private set
+
+    /** Разблокировка по биометрии включена для этой учётки. */
+    var biometricEnabled by mutableStateOf(false)
+        private set
+    val biometricAvailable: Boolean get() = app.biometric.isAvailable()
+
+    init {
+        refreshBiometric()
+    }
+
+    private fun refreshBiometric() {
+        val state = core.state.value
+        biometricEnabled = app.biometric.isEnabled(state.serverAddress, state.login)
+    }
+
+    // Ошибки биометрии — в Snackbar: поле ошибки на этом экране относится к смене пароля.
+
+    /** Шифр нового ключа Keystore — его подтверждают биометрией, прежде чем сохранить ключ. */
+    fun biometricEnrollCipher(): Cipher? = try {
+        app.biometric.encryptCipher()
+    } catch (_: GeneralSecurityException) {
+        notice = string(R.string.biometric_unavailable)
+        null
+    }
+
+    /** Сохраняет мастер-ключ под защитой биометрии; [cipher] уже подтверждён. */
+    fun enableBiometric(cipher: Cipher) = run {
+        val state = core.state.value
+        val key = core.call { it.masterKey() }
+        notice = try {
+            app.biometric.save(cipher, key, state.serverAddress, state.login)
+            string(R.string.biometric_enabled)
+        } catch (_: GeneralSecurityException) {
+            app.biometric.clear()
+            string(R.string.biometric_failed)
+        } finally {
+            key.fill(0)
+        }
+        refreshBiometric()
+    }
+
+    fun disableBiometric() {
+        app.biometric.clear()
+        refreshBiometric()
+    }
+
+    fun biometricError(message: String) {
+        notice = message
+    }
 
     fun updateNewPassword(value: String) {
         newPassword = value
@@ -64,19 +115,29 @@ class AccountViewModel(app: ShronApplication) : CoreViewModel(app) {
         newPassword = ""
         confirm = ""
         generated = null
-        notice = string(R.string.password_changed)
+        // Сохранённый ключ выведен из прежнего пароля и сервером больше не принимается.
+        if (biometricEnabled) {
+            disableBiometric()
+            notice = string(R.string.password_changed_biometric_off)
+        } else {
+            notice = string(R.string.password_changed)
+        }
     }
 
     fun noticeShown() {
         notice = null
     }
 
-    fun logoutEverywhere() = run { core.call { it.logout(true) } }
+    fun logoutEverywhere() = run {
+        core.call { it.logout(true) }
+        app.biometric.clear()
+    }
 
     /** Удаляет учётку навсегда; [login] введён повторно для подтверждения. */
     fun deleteAccount(login: String) = run {
         if (deleteLogin.trim() != login) throw validation(R.string.delete_account_login_mismatch)
         core.call { it.deleteAccount(deletePassword) }
+        app.biometric.clear()
     }
 
     fun resetDeleteForm() {
