@@ -18,6 +18,7 @@ func TestErrorCode(t *testing.T) {
 		nil:                             "",
 		ErrWrongPassword:                CodeWrongPassword,
 		ErrSessionExpired:               CodeSessionExpired,
+		ErrKeyRejected:                  CodeKeyRejected,
 		fmt.Errorf("op: %w", ErrLocked): CodeLocked,
 		fmt.Errorf("%w: too many requests", domain.ErrResourceExhausted): CodeLimitExceeded,
 		fmt.Errorf("get: %w", service.ErrIntegrity):                      CodeIntegrity,

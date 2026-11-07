@@ -11,6 +11,7 @@
 package vault
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -230,6 +231,45 @@ func (v *Vault) Unlock(ctx context.Context, password string) error {
 	}
 	_, err := v.SignIn(ctx, login, password)
 	return err
+}
+
+// UnlockWithKey разблокирует хранилище текущей учётки мастер-ключом, сохранённым после
+// входа по паролю (MasterKey), — например, под защитой биометрии. Argon2id не нужен,
+// но сервер нужен: по ключу выполняется вход, так что отозванная сессия или сменённый
+// пароль ключ не пропустят. Если сервер ключ не принял, возвращается ErrKeyRejected.
+// masterKey копируется; вызывающий может стереть свой экземпляр сразу после вызова.
+func (v *Vault) UnlockWithKey(ctx context.Context, masterKey []byte) error {
+	ctx, cancel := context.WithTimeout(ctx, v.cfg.RequestTimeout)
+	defer cancel()
+
+	key := bytes.Clone(masterKey)
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	if v.login == "" {
+		clear(key)
+		return ErrNotSignedIn
+	}
+	v.lockLocked()
+	if err := v.auth.RefreshToken(ctx, v.login, key); err != nil {
+		clear(key)
+		if errors.Is(err, domain.ErrPasswordChangeRequired) {
+			return ErrKeyRejected
+		}
+		return wrapCredentials(err, ErrKeyRejected)
+	}
+	return v.unlockLocked(v.login, key)
+}
+
+// MasterKey возвращает копию мастер-ключа разблокированного хранилища, чтобы
+// сохранить его для UnlockWithKey. Ключ даёт полный доступ к секретам учётки: хранить
+// его можно только зашифрованным, например ключом Android Keystore.
+func (v *Vault) MasterKey() ([]byte, error) {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	if v.secrets == nil {
+		return nil, ErrLocked
+	}
+	return bytes.Clone(v.masterKey), nil
 }
 
 // Lock блокирует хранилище: ключи стираются, для работы снова нужен пароль.

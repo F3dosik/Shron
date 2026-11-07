@@ -36,6 +36,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.f3dosik.shron.R
 import io.github.f3dosik.shron.ShronApplication
 import io.github.f3dosik.shron.ui.auth.AuthViewModel
+import io.github.f3dosik.shron.ui.auth.BiometricUnlockButton
 import io.github.f3dosik.shron.ui.auth.KdfDowngradeDialog
 import io.github.f3dosik.shron.ui.common.ErrorMessage
 import io.github.f3dosik.shron.ui.common.FormScreen
@@ -83,6 +84,7 @@ fun AutofillPicker(
             )
             ErrorMessage(auth.error)
             PrimaryButton(stringResource(R.string.unlock), busy = auth.busy, onClick = auth::unlock)
+            BiometricUnlockButton(auth, autoPrompt = true)
             TextButton(onClick = onCancel, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.cancel)) }
         }
 

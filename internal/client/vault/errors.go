@@ -20,6 +20,9 @@ var (
 	// ErrSessionExpired — сервер не принял токен (истёк или отозван); хранилище
 	// заблокировано, нужен пароль.
 	ErrSessionExpired = errors.New("session expired")
+	// ErrKeyRejected — сервер не принял сохранённый мастер-ключ: пароль сменили
+	// (например, на другом устройстве). Ключ больше не годится, нужен пароль.
+	ErrKeyRejected = errors.New("master key rejected")
 )
 
 // Code — категория ошибки для интерфейса: по ней приложение решает, что показать
@@ -32,6 +35,7 @@ const (
 	CodeLocked                 Code = "LOCKED"
 	CodeNotSignedIn            Code = "NOT_SIGNED_IN"
 	CodeSessionExpired         Code = "SESSION_EXPIRED"
+	CodeKeyRejected            Code = "KEY_REJECTED"
 	CodePasswordChangeRequired Code = "PASSWORD_CHANGE_REQUIRED"
 	CodeIntegrity              Code = "INTEGRITY"
 	CodeKDFDowngrade           Code = "KDF_DOWNGRADE"
@@ -56,6 +60,7 @@ var codes = []struct {
 	{ErrLocked, CodeLocked},
 	{ErrNotSignedIn, CodeNotSignedIn},
 	{ErrSessionExpired, CodeSessionExpired},
+	{ErrKeyRejected, CodeKeyRejected},
 	{domain.ErrPasswordChangeRequired, CodePasswordChangeRequired},
 	{service.ErrIntegrity, CodeIntegrity},
 	{domain.ErrKDFDowngrade, CodeKDFDowngrade},

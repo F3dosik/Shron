@@ -10,6 +10,8 @@ import io.github.f3dosik.shron.core.GeneratorSettings
 import io.github.f3dosik.shron.core.ShronError
 import io.github.f3dosik.shron.mobile.Mobile
 import io.github.f3dosik.shron.ui.common.CoreViewModel
+import java.security.GeneralSecurityException
+import javax.crypto.Cipher
 
 /**
  * Вход, регистрация, разблокировка и замена временного пароля. Один экземпляр на Activity:
@@ -46,6 +48,10 @@ class AuthViewModel(app: ShronApplication) : CoreViewModel(app) {
     private var kdfRetry: (suspend () -> Unit)? = null
 
     var info by mutableStateOf<String?>(null)
+        private set
+
+    /** Для учётки сохранён ключ разблокировки по биометрии, и биометрия на телефоне есть. */
+    var biometricReady by mutableStateOf(false)
         private set
 
     fun updatePassword(value: String) {
@@ -125,8 +131,57 @@ class AuthViewModel(app: ShronApplication) : CoreViewModel(app) {
         password = ""
     }
 
+    fun refreshBiometric() {
+        val state = core.state.value
+        biometricReady = app.biometric.isAvailable() && app.biometric.isEnabled(state.serverAddress, state.login)
+    }
+
+    /**
+     * Шифр для запроса биометрии. null — ключ Keystore стал недействительным (например,
+     * добавлен отпечаток): сохранённый ключ удалён, на экране — объяснение.
+     */
+    fun biometricCipher(): Cipher? {
+        val cipher = try {
+            app.biometric.decryptCipher()
+        } catch (_: GeneralSecurityException) {
+            app.biometric.clear()
+            null
+        }
+        if (cipher == null) {
+            biometricReady = false
+            error = ShronError(Mobile.CodeKeyRejected, string(R.string.biometric_invalidated))
+        }
+        return cipher
+    }
+
+    /** Разблокирует ключом, расшифрованным после биометрии; сервер проверяет его входом. */
+    fun unlockWithBiometric(cipher: Cipher) = run {
+        val key = try {
+            app.biometric.decrypt(cipher)
+        } catch (_: GeneralSecurityException) {
+            throw ShronError(Mobile.CodeInternal, string(R.string.biometric_failed))
+        }
+        try {
+            core.call { it.unlockWithKey(key) }
+        } catch (e: ShronError) {
+            // Пароль сменили: ключ больше не годится, остаётся вход по паролю.
+            if (e.code == Mobile.CodeKeyRejected) {
+                app.biometric.clear()
+                biometricReady = false
+            }
+            throw e
+        } finally {
+            key.fill(0)
+        }
+    }
+
+    fun biometricError(message: String) {
+        error = ShronError(Mobile.CodeInternal, message)
+    }
+
     fun logout() = run {
         core.call { it.logout(false) }
+        app.biometric.clear()
         password = ""
         confirm = ""
         cancelPasswordChange()

@@ -85,6 +85,7 @@ class SecretsViewModel(app: ShronApplication) : CoreViewModel(app) {
 
     fun logout() = run {
         core.call { it.logout(false) }
+        app.biometric.clear()
         collapsed = emptySet()
     }
 }

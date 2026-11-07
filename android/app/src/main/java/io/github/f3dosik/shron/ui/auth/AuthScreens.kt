@@ -7,6 +7,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import io.github.f3dosik.shron.R
@@ -20,6 +21,7 @@ import io.github.f3dosik.shron.ui.common.PasswordInput
 import io.github.f3dosik.shron.ui.common.PrimaryButton
 import io.github.f3dosik.shron.ui.common.StrengthMessage
 import io.github.f3dosik.shron.ui.common.TextInput
+import io.github.f3dosik.shron.ui.common.rememberBiometricPrompter
 
 @Composable
 fun SignInScreen(vm: AuthViewModel, serverAddress: String, onServerSettings: () -> Unit) {
@@ -103,6 +105,9 @@ fun UnlockScreen(vm: AuthViewModel, login: String, lockReason: String?, onServer
         )
         ErrorMessage(vm.error)
         PrimaryButton(stringResource(R.string.unlock), busy = vm.busy, onClick = vm::unlock)
+        // После ручной блокировки запрос сразу не показывается: пользователь только что
+        // сам закрыл хранилище.
+        BiometricUnlockButton(vm, autoPrompt = lockReason != Mobile.LockManual)
         TextButton(onClick = vm::logout, enabled = !vm.busy, modifier = Modifier.fillMaxWidth()) {
             Text(stringResource(R.string.logout))
         }
@@ -154,4 +159,28 @@ fun KdfDowngradeDialog(vm: AuthViewModel) {
             TextButton(onClick = vm::rejectKdfChange) { Text(stringResource(R.string.cancel)) }
         },
     )
+}
+
+/**
+ * Разблокировка по биометрии, если она включена для учётки. [autoPrompt] — показать
+ * запрос сразу при открытии экрана, не дожидаясь нажатия.
+ */
+@Composable
+fun BiometricUnlockButton(vm: AuthViewModel, autoPrompt: Boolean) {
+    val prompter = rememberBiometricPrompter()
+    val title = stringResource(R.string.biometric_unlock_title)
+    val prompt = {
+        vm.biometricCipher()?.let { cipher ->
+            prompter.authenticate(title, null, cipher, onSuccess = vm::unlockWithBiometric, onError = vm::biometricError)
+        }
+    }
+    LaunchedEffect(Unit) {
+        vm.refreshBiometric()
+        if (autoPrompt && vm.biometricReady) prompt()
+    }
+    if (vm.biometricReady) {
+        OutlinedButton(onClick = { prompt() }, enabled = !vm.busy, modifier = Modifier.fillMaxWidth()) {
+            Text(stringResource(R.string.biometric_unlock))
+        }
+    }
 }

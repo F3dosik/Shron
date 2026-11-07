@@ -15,6 +15,7 @@ const (
 	CodeLocked                 = string(vault.CodeLocked)
 	CodeNotSignedIn            = string(vault.CodeNotSignedIn)
 	CodeSessionExpired         = string(vault.CodeSessionExpired)
+	CodeKeyRejected            = string(vault.CodeKeyRejected)
 	CodePasswordChangeRequired = string(vault.CodePasswordChangeRequired)
 	CodeIntegrity              = string(vault.CodeIntegrity)
 	CodeKDFDowngrade           = string(vault.CodeKDFDowngrade)
@@ -59,6 +60,7 @@ var messages = map[string]string{
 	CodeLocked:                 "Хранилище заблокировано",
 	CodeNotSignedIn:            "Вход не выполнен",
 	CodeSessionExpired:         "Сессия истекла или отозвана — введите мастер-пароль",
+	CodeKeyRejected:            "Мастер-пароль изменился — введите новый пароль",
 	CodePasswordChangeRequired: "Пароль временный — задайте свой",
 	CodeIntegrity:              "Нарушена целостность: сервер вернул не тот секрет",
 	CodeSecretsChanged:         "Секреты изменились во время смены пароля — повторите",
