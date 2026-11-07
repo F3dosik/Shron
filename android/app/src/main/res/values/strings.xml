@@ -96,7 +96,6 @@
     <string name="kdf_downgrade_accept">Принять новые параметры</string>
 
     <!-- Настройки: аккаунт и безопасность -->
-    <string name="account">Настройки</string>
     <string name="settings_title">Настройки</string>
     <string name="account_section">Аккаунт</string>
     <string name="security_section">Безопасность</string>
@@ -129,6 +128,13 @@
 
     <!-- Автозаполнение -->
     <string name="autofill_choose">Shron: выбрать логин</string>
+    <string name="autofill_choose_other">Другой логин…</string>
+    <string name="autofill_unlock_chip">Разблокировать Shron</string>
+    <string name="autofill_unlock_subtitle">Биометрия или мастер-пароль</string>
+    <string name="autofill_choose_subtitle">Поиск по всем логинам в Shron</string>
+    <string name="autofill_unlock_title">Разблокировать Shron</string>
+    <string name="autofill_unlock_for">Заполнение для %1$s</string>
+    <string name="autofill_remember">Предлагать этот логин для %1$s</string>
     <string name="autofill_title">Автозаполнение</string>
     <string name="autofill_sign_in_first">Откройте Shron и войдите в аккаунт, чтобы заполнять пароли.</string>
     <string name="autofill_open_app">Открыть Shron</string>
@@ -137,7 +143,7 @@
     <string name="autofill_no_logins">Логинов пока нет</string>
     <string name="autofill_nothing_found">Ничего не найдено — сотрите поиск, чтобы увидеть все логины</string>
     <string name="autofill_section">Автозаполнение</string>
-    <string name="autofill_hint">Shron предлагает логины в формах входа других приложений и браузеров. Значения подставляются только после того, как вы выберете логин.\n\nChrome по умолчанию заполняет формы сам: включите в нём Настройки → Автозаполнение → «Использовать другую службу».</string>
+    <string name="autofill_hint">Shron предлагает логины в формах входа других приложений и браузеров — над клавиатурой или списком под полем. Предлагаются логины, к которым привязан сайт или приложение (поле «Сайты и приложения»); значения подставляются только после того, как вы выберете логин.\n\nChrome по умолчанию заполняет формы сам: включите в нём Настройки → Автозаполнение → «Использовать другую службу».</string>
     <string name="autofill_enabled">Shron выбран службой автозаполнения</string>
     <string name="autofill_enable">Выбрать Shron для автозаполнения</string>
 

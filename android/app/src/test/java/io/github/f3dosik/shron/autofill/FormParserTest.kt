@@ -105,4 +105,19 @@ class FormParserTest {
         assertEquals("sberbank", searchKeyword("", "ru.sberbank.android.mobile"))
         assertEquals("", searchKeyword(null, null))
     }
+
+    @Test
+    fun `binding uri is the site in a browser and the package in an app`() {
+        assertEquals("github.com", bindingUri("www.GitHub.com", "com.android.chrome"))
+        assertEquals("androidapp://com.github.android", bindingUri(null, "com.github.android"))
+        assertEquals("androidapp://com.github.android", bindingUri(" ", "com.github.android"))
+        assertNull(bindingUri(null, null))
+    }
+
+    @Test
+    fun `uri is added once`() {
+        assertEquals("github.com", addUri("", "github.com"))
+        assertEquals("a.ru\ngithub.com", addUri("a.ru\n\n", "github.com"))
+        assertEquals("GitHub.com\na.ru", addUri("GitHub.com\na.ru", "github.com"))
+    }
 }

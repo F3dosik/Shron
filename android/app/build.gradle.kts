@@ -87,6 +87,7 @@ dependencies {
     implementation(files("libs/shron.aar"))
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.autofill)
     implementation(libs.androidx.biometric)
     // biometric 1.1.0 тянет старый fragment; FragmentActivity нужен BiometricPrompt.
     implementation(libs.androidx.fragment.ktx)

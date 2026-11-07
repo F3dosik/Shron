@@ -1,9 +1,7 @@
 package io.github.f3dosik.shron.autofill
 
-import android.app.PendingIntent
 import android.app.assist.AssistStructure
 import android.content.Context
-import android.content.Intent
 import android.os.Build
 import android.os.CancellationSignal
 import android.service.autofill.AutofillService
@@ -17,22 +15,38 @@ import android.view.View
 import android.view.autofill.AutofillId
 import android.view.autofill.AutofillValue
 import android.widget.RemoteViews
+import androidx.annotation.DrawableRes
 import androidx.annotation.RequiresApi
 import io.github.f3dosik.shron.R
+import io.github.f3dosik.shron.ShronApplication
+import io.github.f3dosik.shron.core.ShronError
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 
 /**
- * Служба автозаполнения. На форму входа она отвечает одним пунктом «Shron» без данных:
- * значения появляются, только когда пользователь выбрал логин в [AutofillPickerActivity]
- * (при необходимости разблокировав хранилище). Так служба ничего не раскрывает приложению,
- * которое выдаёт себя за чужой сайт, и одинаково работает с открытым и закрытым хранилищем.
+ * Служба автозаполнения. Пока хранилище заблокировано, на форму входа она отвечает одной
+ * подсказкой «Разблокировать Shron» без данных. Когда хранилище открыто — логинами,
+ * к которым привязан этот сайт или приложение (строгое сравнение доменов, см.
+ * domain.MatchURI), и «Другим логином…» для выбора из всех. Значения логина приложение
+ * получает, только когда пользователь выбрал его в подсказках.
  */
 @RequiresApi(Build.VERSION_CODES.O)
 class ShronAutofillService : AutofillService() {
 
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+
+    override fun onDestroy() {
+        scope.cancel()
+        super.onDestroy()
+    }
+
     override fun onFillRequest(request: FillRequest, cancellationSignal: CancellationSignal, callback: FillCallback) {
         val structure = request.fillContexts.lastOrNull()?.structure
         val target = structure?.activityComponent?.packageName
-        // Свои экраны не заполняем: там мастер-пароль и формы секретов.
+        // Свои экраны не заполняем: там мастер-пароль и формы записей.
         if (structure == null || target == null || target == packageName) {
             callback.onSuccess(null)
             return
@@ -45,25 +59,24 @@ class ShronAutofillService : AutofillService() {
             callback.onSuccess(null)
             return
         }
+        val inline = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) request.inlineSuggestionsRequest else null
+        val autofill = AutofillTarget(form.username, form.password, scan.webDomain, target, inline)
 
-        val picker = Intent(this, AutofillPickerActivity::class.java)
-            .putExtra(AutofillPickerActivity.EXTRA_USERNAME_ID, form.username)
-            .putExtra(AutofillPickerActivity.EXTRA_PASSWORD_ID, form.password)
-            .putExtra(AutofillPickerActivity.EXTRA_WEB_DOMAIN, scan.webDomain)
-            .putExtra(AutofillPickerActivity.EXTRA_PACKAGE, target)
-        // Неизменяемый PendingIntent: система не дописывает в него данные, всё нужное уже в
-        // наших extras. Свой requestCode на каждый запрос — чтобы extras не перезаписывались.
-        val sender = PendingIntent.getActivity(
-            this,
-            request.id,
-            picker,
-            PendingIntent.FLAG_CANCEL_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-        ).intentSender
-
-        val dataset = datasetBuilder(this, getString(R.string.autofill_choose))
-        listOfNotNull(form.username, form.password).forEach { dataset.setValueCompat(it, null) }
-        dataset.setAuthentication(sender)
-        callback.onSuccess(FillResponse.Builder().addDataset(dataset.build()).build())
+        val core = (application as ShronApplication).core
+        if (!core.state.value.unlocked) {
+            callback.onSuccess(AutofillResponses.locked(this, autofill, request.id))
+            return
+        }
+        val job = scope.launch {
+            val response = try {
+                AutofillResponses.logins(this@ShronAutofillService, autofill, request.id, core.matchLogins(scan.webDomain, target))
+            } catch (_: ShronError) {
+                // Сессия истекла, сервер недоступен и т.п.: хранилище могло заблокироваться.
+                AutofillResponses.locked(this@ShronAutofillService, autofill, request.id)
+            }
+            callback.onSuccess(response)
+        }
+        cancellationSignal.setOnCancelListener { job.cancel() }
     }
 
     override fun onSaveRequest(request: SaveRequest, callback: SaveCallback) {
@@ -95,16 +108,32 @@ class ShronAutofillService : AutofillService() {
     }
 
     companion object {
-        /** Строка в выпадающем списке автозаполнения. */
-        fun presentation(context: Context, text: String) =
-            RemoteViews(context.packageName, R.layout.autofill_item).apply {
-                setTextViewText(R.id.autofill_text, text)
+        /** Подсказка в списке под полем: значок, [text] и необязательная вторая строка. */
+        fun presentation(
+            context: Context,
+            text: String,
+            subtitle: String? = null,
+            @DrawableRes icon: Int = R.drawable.ic_autofill_key,
+        ) = RemoteViews(context.packageName, R.layout.autofill_item).apply {
+            setImageViewResource(R.id.autofill_icon, icon)
+            // Цвет значка — кодом: атрибут tint у ImageView в RemoteViews ненадёжен.
+            setInt(R.id.autofill_icon, "setColorFilter", context.getColor(R.color.autofill_icon))
+            setTextViewText(R.id.autofill_text, text)
+            if (!subtitle.isNullOrEmpty()) {
+                setTextViewText(R.id.autofill_subtitle, subtitle)
+                setViewVisibility(R.id.autofill_subtitle, View.VISIBLE)
             }
+        }
 
         // Dataset.Builder(RemoteViews) и setValue(id, value) устарели в API 33 (Presentations и
         // Field), но работают на всех версиях; новый API — только с 33, а minSdk службы — 26.
         @Suppress("DEPRECATION")
-        fun datasetBuilder(context: Context, text: String) = Dataset.Builder(presentation(context, text))
+        fun datasetBuilder(
+            context: Context,
+            text: String,
+            subtitle: String? = null,
+            @DrawableRes icon: Int = R.drawable.ic_autofill_key,
+        ) = Dataset.Builder(presentation(context, text, subtitle, icon))
 
         @Suppress("DEPRECATION")
         fun Dataset.Builder.setValueCompat(id: AutofillId, value: AutofillValue?): Dataset.Builder =

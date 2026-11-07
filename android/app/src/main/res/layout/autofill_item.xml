@@ -1,28 +1,54 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Пункт в выпадающем списке автозаполнения (RemoteViews: только простые виджеты).
-     Отдельный ImageView, а не drawableStart у TextView: иначе иконку приложения не задать
-     размером 24dp. -->
+<!-- Подсказка в списке автозаполнения под полем — когда клавиатура не показывает подсказки
+     над собой. RemoteViews: только простые виджеты. Значок — в круге цветов иконки
+     приложения, текст — логин и название записи. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:gravity="center_vertical"
+    android:minHeight="56dp"
+    android:minWidth="240dp"
     android:orientation="horizontal"
-    android:padding="12dp"
+    android:paddingStart="12dp"
+    android:paddingTop="8dp"
+    android:paddingEnd="16dp"
+    android:paddingBottom="8dp"
     tools:ignore="UseCompoundDrawables">
 
     <ImageView
-        android:layout_width="24dp"
-        android:layout_height="24dp"
+        android:id="@+id/autofill_icon"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
         android:layout_marginEnd="12dp"
+        android:background="@drawable/bg_autofill_icon"
         android:contentDescription="@null"
-        android:src="@mipmap/ic_launcher_round" />
+        android:padding="8dp"
+        android:src="@drawable/ic_autofill_key" />
 
-    <TextView
-        android:id="@+id/autofill_text"
-        android:layout_width="wrap_content"
+    <LinearLayout
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:ellipsize="end"
-        android:maxLines="1"
-        android:textAppearance="?android:attr/textAppearanceMedium" />
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/autofill_text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textColor="?android:attr/textColorPrimary"
+            android:textSize="16sp" />
+
+        <TextView
+            android:id="@+id/autofill_subtitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textColor="?android:attr/textColorSecondary"
+            android:textSize="13sp"
+            android:visibility="gone" />
+    </LinearLayout>
 </LinearLayout>

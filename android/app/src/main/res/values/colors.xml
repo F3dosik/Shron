@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Значок в подсказках автозаполнения под полем: цвета иконки приложения. -->
+    <color name="autofill_icon_background">#DCE6F2</color>
+    <color name="autofill_icon">#1F3B57</color>
+</resources>

@@ -24,6 +24,9 @@ data class CoreState(
     val lockReason: String? = null,
 )
 
+/** Логин для подсказки автозаполнения — копия mobile.LoginMatch. */
+data class LoginMatch(val name: String, val login: String, val password: String)
+
 /** Сгенерированный пароль и его стойкость (strength — словами, от Go-ядра). */
 data class GeneratedPassword(val password: String, val entropyBits: Int, val strength: String)
 
@@ -81,6 +84,12 @@ class ShronCore(dataDir: File, insecure: Boolean) {
     suspend fun listSecrets(): List<SecretSummary> = call { app ->
         val list = app.listSecrets()
         (0L until list.len()).mapNotNull { list.get(it) }
+    }
+
+    /** Логины, привязанные к сайту [webDomain] или приложению [packageName]. */
+    suspend fun matchLogins(webDomain: String?, packageName: String): List<LoginMatch> = call { app ->
+        val list = app.matchLogins(webDomain.orEmpty(), packageName)
+        (0L until list.len()).mapNotNull { list.get(it) }.map { LoginMatch(it.name, it.login, it.password) }
     }
 
     /** Пароль или парольная фраза по настройкам генератора; генерация — на устройстве. */

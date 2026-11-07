@@ -12,10 +12,14 @@ package vault
 
 import (
 	"bytes"
+	"cmp"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
+	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -319,6 +323,43 @@ func (v *Vault) ExportSecrets(ctx context.Context) ([]domain.SecretPayload, erro
 			result = append(result, info.SecretPayload)
 		}
 		return nil
+	})
+	return result, err
+}
+
+// LoginMatch — логин, подходящий к заполняемой форме.
+type LoginMatch struct {
+	Name     string
+	Login    string
+	Password string
+}
+
+// MatchLogins возвращает логины, у которых среди сайтов и приложений есть подходящий
+// к форме на сайте webDomain или в приложении packageName (domain.MatchURI), по
+// названию. Один запрос к серверу — для подсказок автозаполнения.
+func (v *Vault) MatchLogins(ctx context.Context, webDomain, packageName string) ([]LoginMatch, error) {
+	var result []LoginMatch
+	err := v.withSecrets(ctx, v.cfg.RequestTimeout, func(ctx context.Context, svc service.SecretsService) error {
+		infos, err := svc.ListSecrets(ctx)
+		if err != nil {
+			return err
+		}
+		for _, info := range infos {
+			if info.Type != domain.SecretTypeCredentials {
+				continue
+			}
+			var c domain.CredentialsSecret
+			if err := json.Unmarshal(info.Data, &c); err != nil {
+				return fmt.Errorf("vault: decode credentials %q: %w", info.Name, err)
+			}
+			if slices.ContainsFunc(c.URIs, func(uri string) bool { return domain.MatchURI(uri, webDomain, packageName) }) {
+				result = append(result, LoginMatch{Name: info.Name, Login: c.Login, Password: c.Password})
+			}
+		}
+		return nil
+	})
+	slices.SortFunc(result, func(a, b LoginMatch) int {
+		return cmp.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name))
 	})
 	return result, err
 }

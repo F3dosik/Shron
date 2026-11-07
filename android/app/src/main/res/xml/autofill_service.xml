@@ -1,4 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Описание службы автозаполнения; «Настройки» в системе открывают приложение. -->
+<!--
+  Описание службы автозаполнения; «Настройки» в системе открывают приложение.
+  supportsInlineSuggestions — подсказки чипами над клавиатурой (Android 11+), без него
+  система показывает только список под полем. Старые версии атрибут игнорируют.
+-->
 <autofill-service xmlns:android="http://schemas.android.com/apk/res/android"
-    android:settingsActivity="io.github.f3dosik.shron.MainActivity" />
+    xmlns:tools="http://schemas.android.com/tools"
+    android:settingsActivity="io.github.f3dosik.shron.MainActivity"
+    android:supportsInlineSuggestions="true"
+    tools:targetApi="r" />

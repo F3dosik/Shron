@@ -48,6 +48,14 @@
             android:theme="@style/Theme.Shron"
             android:windowSoftInputMode="adjustResize"
             tools:targetApi="o" />
+
+        <activity
+            android:name=".autofill.AutofillUnlockActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:theme="@style/Theme.Shron.Translucent"
+            android:windowSoftInputMode="adjustResize"
+            tools:targetApi="o" />
     </application>
 
 </manifest>

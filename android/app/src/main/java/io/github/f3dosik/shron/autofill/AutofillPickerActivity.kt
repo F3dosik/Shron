@@ -12,7 +12,6 @@ import android.view.autofill.AutofillValue
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.annotation.RequiresApi
-import androidx.core.content.IntentCompat
 import androidx.fragment.app.FragmentActivity
 import io.github.f3dosik.shron.MainActivity
 import io.github.f3dosik.shron.ShronApplication
@@ -33,11 +32,8 @@ class AutofillPickerActivity : FragmentActivity() {
         enableEdgeToEdge()
         setResult(Activity.RESULT_CANCELED)
 
-        val usernameId = IntentCompat.getParcelableExtra(intent, EXTRA_USERNAME_ID, AutofillId::class.java)
-        val passwordId = IntentCompat.getParcelableExtra(intent, EXTRA_PASSWORD_ID, AutofillId::class.java)
-        val webDomain = intent.getStringExtra(EXTRA_WEB_DOMAIN)
-        val targetPackage = intent.getStringExtra(EXTRA_PACKAGE)
-        if (usernameId == null && passwordId == null) {
+        val target = AutofillTarget.from(intent)
+        if (target == null) {
             finish()
             return
         }
@@ -47,9 +43,10 @@ class AutofillPickerActivity : FragmentActivity() {
             ShronTheme {
                 AutofillPicker(
                     app = app,
-                    requester = webDomain ?: appLabel(targetPackage),
-                    keyword = searchKeyword(webDomain, targetPackage),
-                    onFill = { secret -> fill(secret, usernameId, passwordId) },
+                    requester = target.webDomain ?: appLabel(target.packageName),
+                    keyword = searchKeyword(target.webDomain, target.packageName),
+                    bindUri = bindingUri(target.webDomain, target.packageName),
+                    onFill = { secret -> fill(secret, target.usernameId, target.passwordId) },
                     onOpenApp = {
                         startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                         finish()
@@ -76,12 +73,5 @@ class AutofillPickerActivity : FragmentActivity() {
         } catch (_: PackageManager.NameNotFoundException) {
             pkg
         }
-    }
-
-    companion object {
-        const val EXTRA_USERNAME_ID = "io.github.f3dosik.shron.autofill.USERNAME_ID"
-        const val EXTRA_PASSWORD_ID = "io.github.f3dosik.shron.autofill.PASSWORD_ID"
-        const val EXTRA_WEB_DOMAIN = "io.github.f3dosik.shron.autofill.WEB_DOMAIN"
-        const val EXTRA_PACKAGE = "io.github.f3dosik.shron.autofill.PACKAGE"
     }
 }
