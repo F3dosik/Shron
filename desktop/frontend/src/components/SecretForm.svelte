@@ -4,6 +4,7 @@
   import { formatSize, secretTypes } from '../lib/format'
   import Generator from './Generator.svelte'
   import PasswordInput from './PasswordInput.svelte'
+  import TypeIcon from './TypeIcon.svelte'
 
   // Создание (initial не задан) или изменение секрета. Имя и тип определяют секрет,
   // поэтому при изменении они не редактируются.
@@ -81,12 +82,12 @@
 </script>
 
 <form class="form stack" onsubmit={submit}>
-  <h2>{editing ? 'Изменить секрет' : 'Новый секрет'}</h2>
+  <h2>{editing ? 'Изменить запись' : 'Новая запись'}</h2>
 
   {#if !editing}
     <div class="types">
       {#each secretTypes as t}
-        <button type="button" class:selected={type === t.value} onclick={() => (type = t.value)}>{t.icon} {t.label}</button>
+        <button type="button" class:selected={type === t.value} onclick={() => (type = t.value)}><TypeIcon type={t.value} size={14} /> {t.label}</button>
       {/each}
     </div>
   {/if}
@@ -117,10 +118,10 @@
     <label><span>Текст</span><textarea bind:value={text}></textarea></label>
   {:else if type === 'card'}
     <label><span>Номер карты</span><input bind:value={cardNumber} inputmode="numeric" autocomplete="off" /></label>
-    <label><span>Держатель</span><input bind:value={cardHolder} autocomplete="off" /></label>
+    <label><span>Имя владельца</span><input bind:value={cardHolder} autocomplete="off" /></label>
     <div class="row">
       <label style="flex: 1"><span>Срок (ММ/ГГ)</span><input bind:value={cardExpiry} placeholder="12/30" autocomplete="off" /></label>
-      <label style="flex: 1"><span>CVV</span><PasswordInput bind:value={cardCvv} /></label>
+      <label style="flex: 1"><span>CVV/CVC</span><PasswordInput bind:value={cardCvv} /></label>
     </div>
   {:else if type === 'binary'}
     <div class="row">
@@ -135,7 +136,7 @@
   {/if}
 
   <label>
-    <span>Группа (необязательно)</span>
+    <span>Папка (необязательно)</span>
     <input bind:value={group} list="secret-groups" placeholder="Например, Работа" autocomplete="off" spellcheck="false" />
     <datalist id="secret-groups">
       {#each groups as g}<option value={g}></option>{/each}
@@ -156,5 +157,6 @@
   .form { padding: 24px; max-width: 520px; }
   h2 { margin: 0; font-size: 20px; }
   .types { display: flex; flex-wrap: wrap; gap: 6px; }
+  .types button { display: inline-flex; align-items: center; gap: 6px; }
   .types button.selected { border-color: var(--accent); color: var(--accent); }
 </style>

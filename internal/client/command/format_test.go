@@ -147,7 +147,7 @@ func TestWriteSecretList_All(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	assert.Contains(t, out, "ИМЯ")
+	assert.Contains(t, out, "НАЗВАНИЕ")
 	assert.Contains(t, out, "a")
 	assert.Contains(t, out, "b")
 	assert.Contains(t, out, "m1")
@@ -201,5 +201,5 @@ func TestWriteSecretList_Empty(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	assert.Contains(t, out, "ИМЯ")
+	assert.Contains(t, out, "НАЗВАНИЕ")
 }

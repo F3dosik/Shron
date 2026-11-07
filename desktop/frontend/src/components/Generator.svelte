@@ -54,7 +54,7 @@
     <div class="strength {strengthClass}">
       <div class="bar" style="width: {Math.min(100, (result.entropyBits / 128) * 100)}%"></div>
     </div>
-    <span class="muted small">Стойкость: {result.entropyBits} бит — {result.strength}</span>
+    <span class="muted small">Надёжность: {result.entropyBits} бит — {result.strength}</span>
   {/if}
   {#if error}<p class="error">{error}</p>{/if}
 

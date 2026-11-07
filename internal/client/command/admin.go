@@ -35,13 +35,13 @@ func (c *Commands) newDeleteUserCmd() *cobra.Command {
 	var skipConfirm bool
 	cmd := &cobra.Command{
 		Use:   "delete-user <login>",
-		Short: "Безвозвратно удалить пользователя со всеми секретами",
+		Short: "Безвозвратно удалить пользователя со всеми записями",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			login := args[0]
 
 			if !skipConfirm {
-				fmt.Printf("Пользователь %s и все его секреты будут удалены без возможности восстановления.\n", login)
+				fmt.Printf("Пользователь %s и все его записи будут удалены без возможности восстановления.\n", login)
 				if err := confirmByTyping(login); err != nil {
 					return err
 				}
@@ -98,7 +98,7 @@ func (c *Commands) newUserInfoCmd() *cobra.Command {
 			}
 			fmt.Printf("Логин:      %s\n", u.Login)
 			fmt.Printf("Создан:     %s\n", u.CreatedAt.Local().Format("2006-01-02 15:04"))
-			fmt.Printf("Секретов:   %d\n", u.SecretCount)
+			fmt.Printf("Записей:    %d\n", u.SecretCount)
 			fmt.Printf("Пароль:     %s\n", passwordStatus(u))
 			fmt.Printf("Argon2id:   t=%d, %d MiB\n", u.KDF.Time, u.KDF.MemoryKiB/1024)
 			return nil
@@ -110,15 +110,15 @@ func (c *Commands) newUserInfoCmd() *cobra.Command {
 func (c *Commands) newRevokeSessionsCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "revoke-sessions <login>",
-		Short: "Завершить все сессии пользователя (например, при потере устройства)",
+		Short: "Завершить все сеансы пользователя (например, при потере устройства)",
 		Long: "Отзывает все токены пользователя: на всех устройствах потребуется ввести\n" +
-			"мастер-пароль заново. Пароль и секреты не меняются.",
+			"мастер-пароль заново. Пароль и записи не меняются.",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := c.adminClient.RevokeSessions(cmd.Context(), args[0]); err != nil {
 				return adminError(err, args[0])
 			}
-			fmt.Printf("Все сессии пользователя %s завершены.\n", args[0])
+			fmt.Printf("Все сеансы пользователя %s завершены.\n", args[0])
 			return nil
 		},
 	}

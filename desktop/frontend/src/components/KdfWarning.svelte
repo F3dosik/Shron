@@ -1,4 +1,5 @@
 <script lang="ts">
+  import TriangleAlert from '@lucide/svelte/icons/triangle-alert'
   import { api, errorText } from '../lib/api'
 
   // Предупреждение KDF_DOWNGRADE: сервер прислал параметры Argon2id слабее запомненных.
@@ -32,7 +33,7 @@
 </script>
 
 <div class="kdf-warning stack">
-  <strong>⚠ Возможная атака на сервер</strong>
+  <strong class="title"><TriangleAlert size={16} aria-hidden="true" /> Возможная атака на сервер</strong>
   <p>{message}</p>
   <p class="muted">Если вы не меняли пароль, не принимайте параметры и сообщите администратору сервера.</p>
   {#if error}<p class="error">{error}</p>{/if}
@@ -42,6 +43,7 @@
 </div>
 
 <style>
+  .title { display: inline-flex; align-items: center; gap: 6px; }
   .kdf-warning {
     border: 1px solid var(--danger);
     border-radius: var(--radius);

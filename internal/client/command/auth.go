@@ -40,9 +40,9 @@ func (c *Commands) newRegisterCmd() *cobra.Command {
 		Short: "Регистрация нового пользователя",
 		Long: "Регистрация нового пользователя.\n\n" +
 			"С флагом --temporary пароль генерируется автоматически, действует ограниченное время\n" +
-			"и должен быть сменён при первом входе. Так администратор заводит учётку для другого\n" +
+			"и должен быть сменён при первом входе. Так администратор заводит аккаунт для другого\n" +
 			"человека; работает только через административный порт сервера (ADMIN_PORT).\n\n" +
-			"Стойкий и запоминаемый мастер-пароль можно получить командой\n" +
+			"Надёжный и запоминаемый мастер-пароль можно получить командой\n" +
 			"`shron generate --words 6` — парольная фраза из шести случайных слов.",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -77,7 +77,7 @@ func (c *Commands) newRegisterCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVar(&temporary, "temporary", false,
-		"создать учётку с временным паролем (только через административный порт)")
+		"создать аккаунт с временным паролем (только через административный порт)")
 	kdf.register(cmd)
 	return cmd
 }
@@ -134,7 +134,7 @@ func (c *Commands) newLogoutCmd() *cobra.Command {
 	var all bool
 	cmd := &cobra.Command{
 		Use:   "logout",
-		Short: "Выход из системы (отзыв токена на сервере и удаление сессии)",
+		Short: "Выход из системы (отзыв токена на сервере и удаление сеанса)",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if _, err := os.Stat(c.cfg.SessionPath); os.IsNotExist(err) {
@@ -170,8 +170,8 @@ func (c *Commands) newPasswdCmd() *cobra.Command {
 	var kdf kdfFlags
 	cmd := &cobra.Command{
 		Use:   "passwd",
-		Short: "Смена мастер-пароля с перешифровкой всех секретов",
-		Long: "Смена мастер-пароля с перешифровкой всех секретов.\n\n" +
+		Short: "Смена мастер-пароля с перешифровкой всех записей",
+		Long: "Смена мастер-пароля с перешифровкой всех записей.\n\n" +
 			"Новый пароль получает параметры Argon2id из --kdf-time и --kdf-memory, поэтому смена\n" +
 			"пароля — также способ изменить стоимость деривации ключа. Новый пароль должен\n" +
 			"отличаться от текущего.",
@@ -213,7 +213,7 @@ func (c *Commands) newPasswdCmd() *cobra.Command {
 			}
 			err = c.authService.ChangePassword(cmd.Context(), sess.Login, oldPassword, newPassword, params, reencrypt)
 			if errors.Is(err, domain.ErrSecretsChanged) {
-				return fmt.Errorf("секреты изменились во время смены пароля (например, с другого устройства), " +
+				return fmt.Errorf("записи изменились во время смены пароля (например, с другого устройства), " +
 					"пароль не изменён; повторите 'shron auth passwd'")
 			}
 			if err != nil {
@@ -263,9 +263,9 @@ func (c *Commands) newDeleteAccountCmd() *cobra.Command {
 	var skipConfirm bool
 	cmd := &cobra.Command{
 		Use:   "delete-account",
-		Short: "Безвозвратно удалить свою учётку со всеми секретами",
-		Long: "Безвозвратно удаляет учётку текущего пользователя вместе со всеми секретами.\n" +
-			"Требует мастер-пароль: одного файла сессии для удаления недостаточно.",
+		Short: "Безвозвратно удалить свой аккаунт со всеми записями",
+		Long: "Безвозвратно удаляет аккаунт текущего пользователя вместе со всеми записями.\n" +
+			"Требует мастер-пароль: одного файла сеанса для удаления недостаточно.",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			sess, err := session.Load(c.cfg.SessionPath)
@@ -274,7 +274,7 @@ func (c *Commands) newDeleteAccountCmd() *cobra.Command {
 			}
 
 			if !skipConfirm {
-				fmt.Printf("Учётка %s и все её секреты будут удалены без возможности восстановления.\n", sess.Login)
+				fmt.Printf("Аккаунт %s и все его записи будут удалены без возможности восстановления.\n", sess.Login)
 				if err := confirmByTyping(sess.Login); err != nil {
 					return err
 				}
@@ -295,7 +295,7 @@ func (c *Commands) newDeleteAccountCmd() *cobra.Command {
 				return err
 			}
 
-			fmt.Println("Учётка удалена.")
+			fmt.Println("Аккаунт удалён.")
 			return nil
 		},
 	}

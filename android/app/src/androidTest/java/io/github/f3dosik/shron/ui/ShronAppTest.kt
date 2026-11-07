@@ -83,7 +83,7 @@ class ShronAppTest {
         configureUnreachableServer()
         click(str(R.string.switch_to_register))
         click(str(R.string.generate_master_password))
-        waitForText("Стойкость", substring = true)
+        waitForText("Надёжность", substring = true)
 
         // Два поля пароля и поле логина; пароль показан открытым, чтобы его записать.
         val values = rule.onAllNodes(hasSetTextAction()).fetchSemanticsNodes()

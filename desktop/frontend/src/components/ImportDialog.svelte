@@ -44,11 +44,11 @@
   }
 </script>
 
-<Modal title="Импорт секретов" onclose={close}>
+<Modal title="Импорт записей" onclose={close}>
   {#if result}
     <div class="stack">
       <p style="margin: 0">
-        Экспорт учётки <b>{result.sourceLogin}</b> от {formatDate(result.exportedAt)}, секретов в файле: {result.total}.
+        Экспорт аккаунта <b>{result.sourceLogin}</b> от {formatDate(result.exportedAt)}, записей в файле: {result.total}.
       </p>
       <ul class="report">
         <li>Создано: <b>{result.created}</b></li>
@@ -57,7 +57,7 @@
         {#if result.failed.length}<li class="error">Ошибок: {result.failed.length}</li>{/if}
       </ul>
       {#if result.interrupted}
-        <p class="error" style="margin: 0">Импорт прерван: {result.interruptReason}. Остальные секреты не обработаны.</p>
+        <p class="error" style="margin: 0">Импорт прерван: {result.interruptReason}. Остальные записи не обработаны.</p>
       {/if}
       {#if result.failed.length}
         <ul class="failures">
@@ -73,8 +73,8 @@
         {#if file}<span class="muted">{file.name}</span>{/if}
       </div>
       <label><span>Пароль экспорта</span><PasswordInput bind:value={password} /></label>
-      <label class="check"><input type="checkbox" bind:checked={overwrite} /> Перезаписывать секреты с тем же именем и типом</label>
-      <p class="muted" style="margin: 0; font-size: 12px">Без этой отметки такие секреты пропускаются.</p>
+      <label class="check"><input type="checkbox" bind:checked={overwrite} /> Перезаписывать записи с тем же названием и типом</label>
+      <p class="muted" style="margin: 0; font-size: 12px">Без этой отметки такие записи пропускаются.</p>
       {#if busy}<p class="muted">Импорт…</p>{/if}
       {#if error}<p class="error">{error}</p>{/if}
       <div class="row">

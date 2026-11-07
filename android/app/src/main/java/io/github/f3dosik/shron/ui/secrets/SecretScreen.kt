@@ -5,6 +5,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -16,8 +17,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -66,6 +70,7 @@ fun SecretScreen(
         }
     }
     var confirmDelete by remember { mutableStateOf(false) }
+    var menu by remember { mutableStateOf(false) }
     val secret = vm.secret
 
     Scaffold(
@@ -82,8 +87,23 @@ fun SecretScreen(
                         IconButton(onClick = { onEdit(secret) }, enabled = !vm.busy) {
                             Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.edit))
                         }
-                        IconButton(onClick = { confirmDelete = true }, enabled = !vm.busy) {
-                            Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.delete))
+                        // Удаление — в меню, а не рядом с «Изменить»: так его не задеть случайно.
+                        Box {
+                            IconButton(onClick = { menu = true }, enabled = !vm.busy) {
+                                Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.secret_menu))
+                            }
+                            DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error) },
+                                    leadingIcon = {
+                                        Icon(Icons.Filled.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                                    },
+                                    onClick = {
+                                        menu = false
+                                        confirmDelete = true
+                                    },
+                                )
+                            }
                         }
                     }
                 },

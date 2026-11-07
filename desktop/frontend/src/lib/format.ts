@@ -1,16 +1,13 @@
+// Типы записей: label — полное название, short — в переключателях и фильтрах.
 export const secretTypes = [
-  { value: 'credentials', label: 'Логин и пароль', icon: '🔑' },
-  { value: 'text', label: 'Заметка', icon: '📝' },
-  { value: 'card', label: 'Банковская карта', icon: '💳' },
-  { value: 'binary', label: 'Файл', icon: '📎' },
+  { value: 'credentials', label: 'Логин', short: 'Логин' },
+  { value: 'text', label: 'Заметка', short: 'Заметка' },
+  { value: 'card', label: 'Банковская карта', short: 'Карта' },
+  { value: 'binary', label: 'Файл', short: 'Файл' },
 ] as const
 
 export function typeLabel(type: string): string {
   return secretTypes.find((t) => t.value === type)?.label ?? type
-}
-
-export function typeIcon(type: string): string {
-  return secretTypes.find((t) => t.value === type)?.icon ?? '•'
 }
 
 export function formatDate(iso: string): string {

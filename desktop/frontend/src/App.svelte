@@ -9,7 +9,7 @@
   import Vault from './components/Vault.svelte'
   import AdminPanel from './components/AdminPanel.svelte'
 
-  // Экран выбирается по состоянию бэкенда: не настроено → настройки, нет учётки →
+  // Экран выбирается по состоянию бэкенда: не настроено → настройки, нет аккаунта →
   // вход, заблокировано → разблокировка, иначе — хранилище.
   let appState: State | null = $state(null)
   let showSettings = $state(false)
@@ -19,7 +19,7 @@
 
   const lockMessages: Record<string, string> = {
     idle: 'Хранилище заблокировано из-за бездействия.',
-    session_expired: 'Сессия завершена: на другом устройстве выполнен выход или сменён пароль. Введите мастер-пароль.',
+    session_expired: 'Сеанс завершён: на другом устройстве выполнен выход или сменён пароль. Введите мастер-пароль.',
     manual: '',
     signed_out: '',
   }
@@ -90,6 +90,7 @@
 {:else}
   <Vault
     login={appState.login}
+    serverAddress={appState.serverAddress}
     onlocked={refresh}
     onsignedout={() => { lockMessage = ''; refresh() }}
     onsettings={() => (showSettings = true)}

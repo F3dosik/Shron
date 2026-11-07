@@ -13,7 +13,7 @@ import (
 func (c *Commands) newSecretCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "secret",
-		Short: "Управление секретами",
+		Short: "Управление записями",
 	}
 	cmd.AddCommand(
 		c.newCreateCmd(),
@@ -33,7 +33,7 @@ func (c *Commands) newCreateCmd() *cobra.Command {
 	var gen genFlags
 	cmd := &cobra.Command{
 		Use:   "create",
-		Short: "Создать новый секрет",
+		Short: "Создать запись",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			t, err := domain.ParseSecretType(secretType)
 			if err != nil {
@@ -73,16 +73,16 @@ func (c *Commands) newCreateCmd() *cobra.Command {
 			}); err != nil {
 				return err
 			}
-			fmt.Println("Секрет создан")
+			fmt.Println("Запись создана")
 			if generated != "" {
 				fmt.Printf("Сгенерированный пароль: %s\n", generated)
 			}
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&name, "name", "", "Имя секрета (обязательно)")
+	cmd.Flags().StringVar(&name, "name", "", "Название записи (обязательно)")
 	cmd.Flags().StringVar(&secretType, "type", "", "Тип: credentials|text|card|binary (обязательно)")
-	cmd.Flags().StringVar(&group, "group", "", "Группа секрета (по желанию)")
+	cmd.Flags().StringVar(&group, "group", "", "Папка записи (по желанию)")
 	cmd.Flags().BoolVar(&generate, "generate", false, "сгенерировать пароль вместо ввода (для credentials)")
 	gen.register(cmd)
 	_ = cmd.MarkFlagRequired("name")
@@ -98,7 +98,7 @@ func (c *Commands) newUpdateCmd() *cobra.Command {
 	var gen genFlags
 	cmd := &cobra.Command{
 		Use:   "update",
-		Short: "Изменить секрет",
+		Short: "Изменить запись",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			t, err := domain.ParseSecretType(secretType)
 			if err != nil {
@@ -148,16 +148,16 @@ func (c *Commands) newUpdateCmd() *cobra.Command {
 			}); err != nil {
 				return err
 			}
-			fmt.Println("Секрет обновлен")
+			fmt.Println("Запись изменена")
 			if generated != "" {
 				fmt.Printf("Сгенерированный пароль: %s\n", generated)
 			}
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&name, "name", "", "Имя секрета (обязательно)")
+	cmd.Flags().StringVar(&name, "name", "", "Название записи (обязательно)")
 	cmd.Flags().StringVar(&secretType, "type", "", "Тип: credentials|text|card|binary (обязательно)")
-	cmd.Flags().StringVar(&group, "group", "", `Группа секрета: без флага остаётся прежняя, --group "" убирает из группы`)
+	cmd.Flags().StringVar(&group, "group", "", `Папка записи: без флага остаётся прежняя, --group "" убирает из папки`)
 	cmd.Flags().BoolVar(&generate, "generate", false, "сгенерировать пароль вместо ввода (для credentials)")
 	gen.register(cmd)
 	_ = cmd.MarkFlagRequired("name")
@@ -174,7 +174,7 @@ func (c *Commands) newGetCmd() *cobra.Command {
 	var outputPath string
 	cmd := &cobra.Command{
 		Use:   "get",
-		Short: "Получить секрет",
+		Short: "Показать запись",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			t, err := domain.ParseSecretType(secretType)
 			if err != nil {
@@ -194,7 +194,7 @@ func (c *Commands) newGetCmd() *cobra.Command {
 			return WriteSecret(info, OutputOptions{JSON: jsonOutput, OutputPath: outputPath})
 		},
 	}
-	cmd.Flags().StringVar(&name, "name", "", "Имя секрета (обязательно)")
+	cmd.Flags().StringVar(&name, "name", "", "Название записи (обязательно)")
 	cmd.Flags().StringVar(&secretType, "type", "", "Тип: credentials|text|card|binary (обязательно)")
 	cmd.Flags().BoolVar(&jsonOutput, "json", false, "Вывести в формате JSON")
 	cmd.Flags().StringVar(&outputPath, "output", "", "Сохранить в файл (для binary — сырые данные)")
@@ -211,7 +211,7 @@ func (c *Commands) newListCmd() *cobra.Command {
 	var filterType, filterGroup string
 	cmd := &cobra.Command{
 		Use:   "list",
-		Short: "Список секретов",
+		Short: "Список записей",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			secretSvc, err := c.unlockSecretService(cmd.Context())
 			if err != nil {
@@ -227,7 +227,7 @@ func (c *Commands) newListCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&filterType, "type", "", "Фильтр по типам: credentials|text|card|binary")
-	cmd.Flags().StringVar(&filterGroup, "group", "", "Только секреты этой группы")
+	cmd.Flags().StringVar(&filterGroup, "group", "", "Только записи этой папки")
 	return cmd
 }
 
@@ -238,7 +238,7 @@ func (c *Commands) newDeleteCmd() *cobra.Command {
 	var skipConfirm bool
 	cmd := &cobra.Command{
 		Use:   "delete",
-		Short: "Удаление секрета",
+		Short: "Удалить запись",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			t, err := domain.ParseSecretType(secretType)
 			if err != nil {
@@ -251,7 +251,7 @@ func (c *Commands) newDeleteCmd() *cobra.Command {
 			}
 
 			if !skipConfirm {
-				confirm, err := promptLine(fmt.Sprintf("Удалить секрет %q типа %s? [y/N]: ", name, t))
+				confirm, err := promptLine(fmt.Sprintf("Удалить запись %q типа %s? [y/N]: ", name, t))
 				if err != nil {
 					return err
 				}
@@ -264,11 +264,11 @@ func (c *Commands) newDeleteCmd() *cobra.Command {
 			if err := secretSvc.DeleteSecret(cmd.Context(), name, t); err != nil {
 				return err
 			}
-			fmt.Printf("Секрет %q (%s) удалён\n", name, t)
+			fmt.Printf("Запись %q (%s) удалена\n", name, t)
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&name, "name", "", "Имя секрета (обязательно)")
+	cmd.Flags().StringVar(&name, "name", "", "Название записи (обязательно)")
 	cmd.Flags().StringVar(&secretType, "type", "", "Тип: credentials|text|card|binary (обязательно)")
 	cmd.Flags().BoolVarP(&skipConfirm, "yes", "y", false, "Пропустить подтверждение")
 	_ = cmd.MarkFlagRequired("name")

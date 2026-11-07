@@ -10,7 +10,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.f3dosik.shron.ShronApplication
-import io.github.f3dosik.shron.ui.account.AccountScreen
+import io.github.f3dosik.shron.ui.account.SettingsScreen
 import io.github.f3dosik.shron.ui.account.AccountViewModel
 import io.github.f3dosik.shron.ui.auth.AuthViewModel
 import io.github.f3dosik.shron.ui.auth.KdfDowngradeDialog
@@ -34,7 +34,7 @@ sealed interface VaultRoute {
     data object Add : VaultRoute
     data class View(val ref: SecretRef) : VaultRoute
     data class Edit(val secret: SecretDetails) : VaultRoute
-    data object Account : VaultRoute
+    data object Settings : VaultRoute
 }
 
 /**
@@ -99,11 +99,9 @@ fun ShronRoot(app: ShronApplication) {
                 val vm: SecretsViewModel = viewModel { SecretsViewModel(app) }
                 SecretsScreen(
                     vm = vm,
-                    login = state.login,
                     onAdd = { nav.open(VaultRoute.Add) },
                     onOpen = { nav.open(VaultRoute.View(it)) },
-                    onAccount = { nav.open(VaultRoute.Account) },
-                    onServerSettings = nav::openServerSettings,
+                    onSettings = { nav.open(VaultRoute.Settings) },
                 )
             }
 
@@ -126,9 +124,15 @@ fun ShronRoot(app: ShronApplication) {
                 )
             }
 
-            VaultRoute.Account -> {
-                val vm: AccountViewModel = viewModel(key = "account-$session") { AccountViewModel(app) }
-                AccountScreen(vm, state.login, onBack = { nav.open(VaultRoute.List) })
+            VaultRoute.Settings -> {
+                val vm: AccountViewModel = viewModel(key = "settings-$session") { AccountViewModel(app) }
+                SettingsScreen(
+                    vm = vm,
+                    login = state.login,
+                    serverAddress = state.serverAddress,
+                    onBack = { nav.open(VaultRoute.List) },
+                    onConnection = nav::openServerSettings,
+                )
             }
 
             is VaultRoute.Edit -> {

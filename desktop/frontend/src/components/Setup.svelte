@@ -65,7 +65,7 @@
 <div class="center-screen">
   <form class="card stack" onsubmit={save}>
     <div>
-      <h1>{initial.configured ? 'Настройки' : 'Подключение к серверу'}</h1>
+      <h1>Подключение к серверу</h1>
       <p class="lead">Адрес сервера Shron и его корневой сертификат (ca.crt).</p>
     </div>
 

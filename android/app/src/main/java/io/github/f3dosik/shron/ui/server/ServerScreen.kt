@@ -101,8 +101,6 @@ fun ServerScreen(vm: ServerViewModel, onSaved: () -> Unit, onClose: (() -> Unit)
 
         BackgroundLockChoice(vm.backgroundLockSeconds, { vm.backgroundLockSeconds = it }, enabled = !vm.busy)
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) AutofillSection(onExternalActivity = pauseLock)
-
         ErrorMessage(vm.error)
         InfoMessage(vm.checkResult)
 
@@ -157,7 +155,7 @@ private fun BackgroundLockChoice(seconds: Int, onChange: (Int) -> Unit, enabled:
 /** Служба автозаполнения выбирается в системных настройках; здесь — состояние и переход туда. */
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
-private fun AutofillSection(onExternalActivity: () -> Unit) {
+fun AutofillSection(onExternalActivity: () -> Unit) {
     val context = LocalContext.current
     val manager = remember(context) { context.getSystemService(AutofillManager::class.java) }
     var enabled by remember { mutableStateOf(manager?.hasEnabledAutofillServices() == true) }

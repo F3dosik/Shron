@@ -82,11 +82,11 @@
   <header>
     <div>
       <h1>Администрирование</h1>
-      <p class="muted">Сервер {serverAddress} · административный порт. Хранилище секретов здесь недоступно.</p>
+      <p class="muted">Сервер {serverAddress} · административный порт. Хранилище здесь недоступно.</p>
     </div>
     <span class="spacer"></span>
     <button onclick={reload} disabled={loading}>Обновить</button>
-    <button onclick={onsettings}>Настройки</button>
+    <button onclick={onsettings}>Подключение</button>
     <button class="primary" onclick={() => (dialog = 'create')}>Создать пользователя</button>
   </header>
 
@@ -96,7 +96,7 @@
 
   <table>
     <thead>
-      <tr><th>Логин</th><th>Создан</th><th>Секретов</th><th>Пароль</th><th>Argon2id</th><th></th></tr>
+      <tr><th>Логин</th><th>Создан</th><th>Записей</th><th>Пароль</th><th>Argon2id</th><th></th></tr>
     </thead>
     <tbody>
       {#each visible as u (u.login)}
@@ -115,7 +115,7 @@
           </td>
           <td class="muted">t={u.kdfTime}, {u.kdfMemoryMiB} MiB</td>
           <td class="actions">
-            <button onclick={() => { target = u.login; dialog = 'revoke' }}>Завершить сессии</button>
+            <button onclick={() => { target = u.login; dialog = 'revoke' }}>Завершить сеансы</button>
             <button class="danger" onclick={() => { target = u.login; typedLogin = ''; dialog = 'delete' }}>Удалить</button>
           </td>
         </tr>
@@ -164,16 +164,16 @@
     </div>
   </Modal>
 {:else if dialog === 'revoke'}
-  <Modal title="Завершить сессии?" onclose={() => (dialog = '')}>
+  <Modal title="Завершить сеансы?" onclose={() => (dialog = '')}>
     <div class="stack">
       <p style="margin: 0">
         На всех устройствах пользователя <b>{target}</b> потребуется снова ввести мастер-пароль.
-        Пароль и секреты не меняются.
+        Пароль и записи не меняются.
       </p>
       <div class="row">
         <span class="spacer"></span>
         <button onclick={() => (dialog = '')}>Отмена</button>
-        <button class="primary" disabled={busy} onclick={() => run(() => api.adminRevokeSessions(target), `Сессии ${target} завершены`)}>
+        <button class="primary" disabled={busy} onclick={() => run(() => api.adminRevokeSessions(target), `Сеансы ${target} завершены`)}>
           Завершить
         </button>
       </div>
@@ -182,7 +182,7 @@
 {:else if dialog === 'delete'}
   <Modal title="Удалить пользователя?" onclose={() => (dialog = '')}>
     <div class="stack">
-      <p style="margin: 0">Пользователь <b>{target}</b> и все его секреты будут удалены без возможности восстановления.</p>
+      <p style="margin: 0">Пользователь <b>{target}</b> и все его записи будут удалены без возможности восстановления.</p>
       <label><span>Для подтверждения введите логин</span><input bind:value={typedLogin} autocomplete="off" spellcheck="false" /></label>
       <div class="row">
         <span class="spacer"></span>
