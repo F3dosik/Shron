@@ -75,7 +75,7 @@
       </label>
       <SuggestPassphrase onpick={(p) => { password = p; confirm = p }} />
       <p class="muted" style="margin: 0">
-        Мастер-пароль нельзя восстановить: секреты шифруются ключом из него, и сервер его не знает.
+        Мастер-пароль нельзя восстановить: записи шифруются ключом из него, и сервер его не знает.
       </p>
     {/if}
 
@@ -95,10 +95,10 @@
     </button>
     <div class="row">
       <button type="button" class="link" onclick={() => { mode = mode === 'signin' ? 'register' : 'signin'; error = '' }}>
-        {mode === 'signin' ? 'Создать учётку' : 'У меня уже есть учётка'}
+        {mode === 'signin' ? 'Создать аккаунт' : 'У меня уже есть аккаунт'}
       </button>
       <span class="spacer"></span>
-      <button type="button" class="link" onclick={onsettings}>Настройки</button>
+      <button type="button" class="link" onclick={onsettings}>Подключение</button>
     </div>
   </form>
 </div>

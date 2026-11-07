@@ -1,6 +1,8 @@
 <script lang="ts">
   import { api, AppError, errorText, lockedCodes, type Secret } from '../lib/api'
-  import { formatCardNumber, formatDate, formatSize, maskCardNumber, typeIcon, typeLabel } from '../lib/format'
+  import Folder from '@lucide/svelte/icons/folder'
+  import { formatCardNumber, formatDate, formatSize, maskCardNumber, typeLabel } from '../lib/format'
+  import TypeIcon from './TypeIcon.svelte'
 
   // Карточка секрета. Содержимое запрашивается только при открытии и живёт,
   // пока карточка открыта; значения скрыты, пока их не показали явно.
@@ -94,7 +96,8 @@
     <header>
       <div>
         <div class="type muted">
-          {typeIcon(secret.type)} {typeLabel(secret.type)}{#if secret.group}&nbsp;· 📁 {secret.group}{/if}
+          <TypeIcon type={secret.type} size={13} /> {typeLabel(secret.type)}
+          {#if secret.group}<span class="sep">·</span><Folder size={13} aria-hidden="true" /> {secret.group}{/if}
         </div>
         <h2>{secret.name}</h2>
       </div>
@@ -122,9 +125,9 @@
       {:else if secret.type === 'card'}
         {@render field('Номер', secret.cardNumber, 'number', false, revealed.number ? formatCardNumber(secret.cardNumber) : maskCardNumber(secret.cardNumber))}
         <div><button class="link" onclick={() => toggle('number')}>{revealed.number ? 'Скрыть номер' : 'Показать номер'}</button></div>
-        {@render field('Держатель', secret.cardHolder, 'holder')}
+        {@render field('Имя владельца', secret.cardHolder, 'holder')}
         {@render field('Срок действия', secret.cardExpiry, 'expiry')}
-        {@render field('CVV', secret.cardCvv, 'cvv', true)}
+        {@render field('CVV/CVC', secret.cardCvv, 'cvv', true)}
       {:else if secret.type === 'binary'}
         <div class="field">
           <span class="label">Файл</span>
@@ -143,7 +146,7 @@
       {/if}
 
       <p class="muted dates">
-        Создан {formatDate(secret.createdAt)} · изменён {formatDate(secret.updatedAt)}
+        Создано {formatDate(secret.createdAt)} · изменено {formatDate(secret.updatedAt)}
       </p>
     </div>
   {/if}
@@ -153,7 +156,8 @@
   .detail { padding: 24px; }
   header { display: flex; align-items: center; gap: 8px; margin-bottom: 20px; }
   h2 { margin: 2px 0 0; font-size: 20px; word-break: break-word; }
-  .type { font-size: 12px; }
+  .type { display: flex; align-items: center; gap: 4px; font-size: 12px; }
+  .sep { margin: 0 2px; }
   .fields { display: flex; flex-direction: column; gap: 16px; }
   .field { display: flex; flex-direction: column; gap: 4px; }
   .label { font-size: 12px; color: var(--muted); }

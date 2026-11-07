@@ -42,7 +42,7 @@
     <SuggestPassphrase onpick={(p) => { next = p; confirm = p }} />
 
     <button type="button" class="link" style="align-self: flex-start" onclick={() => (advanced = !advanced)}>
-      {advanced ? '▾' : '▸'} Параметры Argon2id
+      {advanced ? '▾' : '▸'} Сложность ключа (Argon2id)
     </button>
     {#if advanced}
       <div class="row">
@@ -52,7 +52,7 @@
       <p class="muted" style="margin: 0; font-size: 12px">Больше — дороже перебор пароля при утечке БД, но медленнее разблокировка на всех устройствах.</p>
     {/if}
 
-    <p class="muted" style="margin: 0; font-size: 12px">Все секреты будут перешифрованы. На других устройствах потребуется войти заново.</p>
+    <p class="muted" style="margin: 0; font-size: 12px">Все записи будут перешифрованы. На других устройствах потребуется войти заново.</p>
     {#if busy}<p class="muted">Перешифровка…</p>{/if}
     {#if error}<p class="error">{error}</p>{/if}
     <div class="row">

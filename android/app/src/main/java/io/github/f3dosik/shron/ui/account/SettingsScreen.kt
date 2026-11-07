@@ -1,6 +1,8 @@
 package io.github.f3dosik.shron.ui.account
 
+import android.os.Build
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -12,12 +14,15 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -47,10 +52,21 @@ import io.github.f3dosik.shron.ui.common.StrengthMessage
 import io.github.f3dosik.shron.ui.common.TextInput
 import io.github.f3dosik.shron.ui.common.rememberBiometricPrompter
 import io.github.f3dosik.shron.ui.common.rememberExternalActivity
+import io.github.f3dosik.shron.ui.server.AutofillSection
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AccountScreen(vm: AccountViewModel, login: String, onBack: () -> Unit) {
+/**
+ * Настройки открытого хранилища: аккаунт, безопасность, автозаполнение. Подключение к
+ * серверу — отдельным экраном: его сохранение блокирует хранилище.
+ */
+fun SettingsScreen(
+    vm: AccountViewModel,
+    login: String,
+    serverAddress: String,
+    onBack: () -> Unit,
+    onConnection: () -> Unit,
+) {
     BackHandler(onBack = onBack)
     val snackbar = remember { SnackbarHostState() }
     LaunchedEffect(vm.notice) {
@@ -66,7 +82,7 @@ fun AccountScreen(vm: AccountViewModel, login: String, onBack: () -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(login, maxLines = 1) },
+                title = { Text(stringResource(R.string.settings_title)) },
                 navigationIcon = {
                     IconButton(onClick = onBack, enabled = enabled) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
@@ -85,10 +101,30 @@ fun AccountScreen(vm: AccountViewModel, login: String, onBack: () -> Unit) {
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            ChangePasswordSection(vm, enabled)
+            SectionTitle(stringResource(R.string.account_section))
+            ListItem(
+                headlineContent = { Text(login) },
+                supportingContent = { Text(stringResource(R.string.server_label, serverAddress)) },
+                leadingContent = { Icon(Icons.Filled.AccountCircle, contentDescription = null) },
+            )
 
             HorizontalDivider()
+            SectionTitle(stringResource(R.string.security_section))
             BiometricSection(vm, enabled)
+            ListItem(
+                headlineContent = { Text(stringResource(R.string.connection_open)) },
+                supportingContent = { Text(stringResource(R.string.connection_open_hint)) },
+                trailingContent = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) },
+                modifier = Modifier.clickable(enabled = enabled, onClick = onConnection),
+            )
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                HorizontalDivider()
+                AutofillSection(onExternalActivity = rememberExternalActivity())
+            }
+
+            HorizontalDivider()
+            ChangePasswordSection(vm, enabled)
 
             HorizontalDivider()
             Text(stringResource(R.string.sessions_section), style = MaterialTheme.typography.titleMedium)
@@ -146,13 +182,18 @@ fun AccountScreen(vm: AccountViewModel, login: String, onBack: () -> Unit) {
 }
 
 @Composable
+private fun SectionTitle(text: String) {
+    Text(text, style = MaterialTheme.typography.titleMedium)
+}
+
+@Composable
 private fun BiometricSection(vm: AccountViewModel, enabled: Boolean) {
     val prompter = rememberBiometricPrompter()
     val pauseLock = rememberExternalActivity()
     val title = stringResource(R.string.biometric_enable_title)
     val available = vm.biometricAvailable
 
-    Text(stringResource(R.string.biometric_section), style = MaterialTheme.typography.titleMedium)
+    Text(stringResource(R.string.biometric_section), style = MaterialTheme.typography.titleSmall)
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(stringResource(R.string.biometric_switch), modifier = Modifier.weight(1f))
         Switch(

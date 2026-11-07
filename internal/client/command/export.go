@@ -25,11 +25,11 @@ func (c *Commands) newExportCmd() *cobra.Command {
 	)
 	cmd := &cobra.Command{
 		Use:   "export",
-		Short: "Экспорт всех секретов в зашифрованный файл",
-		Long: "Сохраняет все секреты в файл, зашифрованный отдельным паролем экспорта\n" +
+		Short: "Экспорт всех записей в зашифрованный файл",
+		Long: "Сохраняет все записи в файл, зашифрованный отдельным паролем экспорта\n" +
 			"(Argon2id + AES-256-GCM). Файл не зависит от сервера и мастер-пароля: его можно\n" +
-			"хранить где угодно и импортировать в любую учётку командой `shron import`.\n\n" +
-			"Стойкий пароль экспорта: `shron generate --words 6`.",
+			"хранить где угодно и импортировать в любой аккаунт командой `shron import`.\n\n" +
+			"Надёжный пароль экспорта: `shron generate --words 6`.",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if !force {
@@ -68,7 +68,7 @@ func (c *Commands) newExportCmd() *cobra.Command {
 			if err := os.WriteFile(output, data, 0o600); err != nil {
 				return fmt.Errorf("запись файла: %w", err)
 			}
-			fmt.Printf("Экспортировано секретов: %d → %s\n", len(archive.Secrets), output)
+			fmt.Printf("Экспортировано записей: %d → %s\n", len(archive.Secrets), output)
 			fmt.Println("Без пароля экспорта файл не расшифровать — храните пароль отдельно от файла.")
 			return nil
 		},
@@ -84,9 +84,9 @@ func (c *Commands) newImportCmd() *cobra.Command {
 	var overwrite bool
 	cmd := &cobra.Command{
 		Use:   "import <файл>",
-		Short: "Импорт секретов из файла экспорта",
-		Long: "Добавляет в текущую учётку секреты из файла, созданного `shron export`.\n" +
-			"Секреты с тем же именем и типом, что уже есть в хранилище, по умолчанию\n" +
+		Short: "Импорт записей из файла экспорта",
+		Long: "Добавляет в текущий аккаунт записи из файла, созданного `shron export`.\n" +
+			"Записи с тем же именем и типом, что уже есть в хранилище, по умолчанию\n" +
 			"пропускаются; с --overwrite — перезаписываются.",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -103,7 +103,7 @@ func (c *Commands) newImportCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			fmt.Printf("В файле секретов: %d (экспорт %s от %s)\n", len(archive.Secrets), archive.Login,
+			fmt.Printf("В файле записей: %d (экспорт %s от %s)\n", len(archive.Secrets), archive.Login,
 				archive.ExportedAt.Local().Format("2006-01-02 15:04"))
 
 			secretSvc, err := c.unlockSecretService(cmd.Context())
@@ -118,7 +118,7 @@ func (c *Commands) newImportCmd() *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().BoolVar(&overwrite, "overwrite", false, "перезаписывать существующие секреты")
+	cmd.Flags().BoolVar(&overwrite, "overwrite", false, "перезаписывать существующие записи")
 	return cmd
 }
 

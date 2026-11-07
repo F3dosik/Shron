@@ -5,9 +5,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -15,7 +15,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.filled.AddCircle
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
@@ -26,12 +28,14 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -58,11 +62,9 @@ import java.util.Date
 @Composable
 fun SecretsScreen(
     vm: SecretsViewModel,
-    login: String,
     onAdd: () -> Unit,
     onOpen: (SecretRef) -> Unit,
-    onAccount: () -> Unit,
-    onServerSettings: () -> Unit,
+    onSettings: () -> Unit,
 ) {
     // Список загружается при каждом показе экрана (после разблокировки, после добавления
     // секрета) и забывается при уходе.
@@ -75,11 +77,8 @@ fun SecretsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(login) },
+                title = { Text(stringResource(R.string.vault_title)) },
                 actions = {
-                    IconButton(onClick = onAdd) {
-                        Icon(Icons.Filled.AddCircle, contentDescription = stringResource(R.string.action_add_secret))
-                    }
                     IconButton(onClick = vm::lock) {
                         Icon(Icons.Filled.Lock, contentDescription = stringResource(R.string.action_lock))
                     }
@@ -89,12 +88,8 @@ fun SecretsScreen(
                         }
                         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                             DropdownMenuItem(
-                                text = { Text(stringResource(R.string.account)) },
-                                onClick = { menu = false; onAccount() },
-                            )
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.server_settings)) },
-                                onClick = { menu = false; onServerSettings() },
+                                text = { Text(stringResource(R.string.settings_title)) },
+                                onClick = { menu = false; onSettings() },
                             )
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.logout)) },
@@ -104,6 +99,11 @@ fun SecretsScreen(
                     }
                 },
             )
+        },
+        floatingActionButton = {
+            FloatingActionButton(onClick = onAdd) {
+                Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.action_add_secret))
+            }
         },
     ) { padding ->
         PullToRefreshBox(
@@ -151,16 +151,21 @@ fun SecretsScreen(
                             HorizontalDivider()
                         }
                     }
+                    // Место под круглую кнопку «+», чтобы она не закрывала последнюю запись.
+                    item { Spacer(Modifier.height(88.dp)) }
                 }
             }
         }
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun SearchBar(vm: SecretsViewModel) {
-    Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+    ) {
         OutlinedTextField(
             value = vm.query,
             onValueChange = { vm.query = it },
@@ -171,23 +176,55 @@ private fun SearchBar(vm: SecretsViewModel) {
             } else null,
             singleLine = true,
             keyboardOptions = KeyboardOptions(autoCorrectEnabled = false, imeAction = ImeAction.Search),
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.weight(1f),
         )
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilterChip(
-                selected = vm.typeFilter == null,
-                onClick = { vm.typeFilter = null },
-                label = { Text(stringResource(R.string.filter_all)) },
-            )
-            listOf(Mobile.TypeCredentials, Mobile.TypeText, Mobile.TypeCard, Mobile.TypeBinary).forEach { type ->
-                FilterChip(
-                    selected = vm.typeFilter == type,
-                    onClick = { vm.typeFilter = if (vm.typeFilter == type) null else type },
-                    label = { Text(stringResource(typeLabel(type)!!)) },
+        TypeFilter(vm.typeFilter, onChange = { vm.typeFilter = it })
+    }
+}
+
+/** Фильтр по типу: один чип с текущим типом, по нажатию — меню типов. */
+@Composable
+private fun TypeFilter(type: String?, onChange: (String?) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    val current = type?.let { typeShortLabel(it) }?.let { stringResource(it) } ?: stringResource(R.string.filter_all)
+    Box {
+        FilterChip(
+            selected = type != null,
+            onClick = { expanded = true },
+            label = { Text(stringResource(R.string.filter_type, current), maxLines = 1) },
+            trailingIcon = { Icon(Icons.Filled.ArrowDropDown, contentDescription = null) },
+            // Высота и форма — как у поля поиска рядом.
+            shape = OutlinedTextFieldDefaults.shape,
+            modifier = Modifier.height(OutlinedTextFieldDefaults.MinHeight),
+        )
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            (listOf<String?>(null) + SECRET_TYPES).forEach { option ->
+                DropdownMenuItem(
+                    text = {
+                        Text(option?.let { stringResource(typeLabel(it)!!) } ?: stringResource(R.string.filter_all_types))
+                    },
+                    trailingIcon = if (option == type) {
+                        { Icon(Icons.Filled.Check, contentDescription = null) }
+                    } else null,
+                    onClick = {
+                        expanded = false
+                        onChange(option)
+                    },
                 )
             }
         }
     }
+}
+
+private val SECRET_TYPES = listOf(Mobile.TypeCredentials, Mobile.TypeText, Mobile.TypeCard, Mobile.TypeBinary)
+
+@StringRes
+private fun typeShortLabel(type: String): Int? = when (type) {
+    Mobile.TypeCredentials -> R.string.type_credentials_short
+    Mobile.TypeText -> R.string.type_text_short
+    Mobile.TypeCard -> R.string.type_card_short
+    Mobile.TypeBinary -> R.string.type_binary_short
+    else -> null
 }
 
 @Composable

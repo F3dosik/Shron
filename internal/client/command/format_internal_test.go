@@ -34,9 +34,9 @@ func TestFormatPretty_Credentials(t *testing.T) {
 	require.NoError(t, err)
 
 	s := string(out)
-	assert.Contains(t, s, "Имя:        test")
-	assert.Contains(t, s, "Метаданные: github")
-	assert.NotContains(t, s, "Группа:", "empty group should be omitted")
+	assert.Contains(t, s, "Название:    test")
+	assert.Contains(t, s, "Комментарий: github")
+	assert.NotContains(t, s, "Папка:", "empty group should be omitted")
 	assert.Contains(t, s, "Логин:    ivan")
 	assert.Contains(t, s, "Пароль:   s3cret")
 }
@@ -47,7 +47,7 @@ func TestFormatPretty_Group(t *testing.T) {
 
 	out, err := formatPretty(info)
 	require.NoError(t, err)
-	assert.Contains(t, string(out), "Группа:     Работа")
+	assert.Contains(t, string(out), "Папка:       Работа")
 }
 
 func TestFormatPretty_Text(t *testing.T) {
@@ -58,7 +58,7 @@ func TestFormatPretty_Text(t *testing.T) {
 
 	s := string(out)
 	assert.Contains(t, s, "hello")
-	assert.NotContains(t, s, "Метаданные:", "empty metadata should be omitted")
+	assert.NotContains(t, s, "Комментарий:", "empty metadata should be omitted")
 }
 
 func TestFormatPretty_Card(t *testing.T) {

@@ -6,10 +6,10 @@
     <string name="hide_password">Скрыть</string>
     <string name="cancel">Отмена</string>
     <string name="save">Сохранить</string>
-    <string name="server_settings">Настройки</string>
-    <string name="logout">Выйти из учётки</string>
+    <string name="server_settings">Подключение</string>
+    <string name="logout">Выйти из аккаунта</string>
     <string name="generate">Сгенерировать</string>
-    <string name="password_strength">Стойкость: %1$s, %2$d бит</string>
+    <string name="password_strength">Надёжность: %1$s, %2$d бит</string>
 
     <!-- Генератор паролей -->
     <string name="generator_chars">Символы</string>
@@ -25,8 +25,8 @@
     <string name="error_read_file">Не удалось прочитать файл</string>
 
     <!-- Сервер -->
-    <string name="server_title">Настройки</string>
-    <string name="server_subtitle">Адрес сервера Shron и сертификат, которым подписан его TLS-сертификат (ca.crt).</string>
+    <string name="server_title">Подключение и блокировка</string>
+    <string name="server_subtitle">Адрес сервера Shron и корневой сертификат (ca.crt), которым подписан его TLS-сертификат. После сохранения хранилище заблокируется.</string>
     <string name="server_section">Сервер</string>
     <string name="lock_section">Блокировка</string>
     <string name="server_address">Адрес сервера</string>
@@ -55,38 +55,38 @@
     <string name="login">Логин</string>
     <string name="master_password">Мастер-пароль</string>
     <string name="master_password_repeat">Мастер-пароль ещё раз</string>
-    <string name="register_warning">Мастер-пароль нельзя восстановить: без него секреты не расшифровать.</string>
+    <string name="register_warning">Мастер-пароль нельзя восстановить: без него записи не расшифровать.</string>
     <string name="generate_master_password">Сгенерировать мастер-пароль</string>
     <string name="generated_master_password_hint">Запишите этот пароль и храните в надёжном месте: восстановить его нельзя.</string>
     <string name="sign_in">Войти</string>
     <string name="register">Зарегистрироваться</string>
-    <string name="switch_to_sign_in">Уже есть учётка — войти</string>
-    <string name="switch_to_register">Создать учётку</string>
-    <string name="account_created">Учётка создана</string>
+    <string name="switch_to_sign_in">Уже есть аккаунт — войти</string>
+    <string name="switch_to_register">Создать аккаунт</string>
+    <string name="account_created">Аккаунт создан</string>
 
     <!-- Разблокировка -->
     <string name="unlock_title">Хранилище заблокировано</string>
     <string name="locked_idle">Заблокировано после бездействия.</string>
-    <string name="locked_session_expired">Сессия истекла или отозвана.</string>
+    <string name="locked_session_expired">Сеанс истёк или завершён.</string>
     <string name="locked_background">Заблокировано, пока приложение было свёрнуто.</string>
-    <string name="account_label">Учётка: %1$s</string>
+    <string name="account_label">Аккаунт: %1$s</string>
     <string name="unlock">Разблокировать</string>
-    <string name="biometric_unlock">Разблокировать по отпечатку</string>
+    <string name="biometric_unlock">Разблокировать биометрией</string>
     <string name="biometric_unlock_title">Разблокировка Shron</string>
-    <string name="biometric_enable_title">Вход по отпечатку в Shron</string>
+    <string name="biometric_enable_title">Разблокировка Shron биометрией</string>
     <string name="biometric_use_password">Ввести пароль</string>
-    <string name="biometric_failed">Не удалось проверить отпечаток — введите мастер-пароль</string>
-    <string name="biometric_invalidated">Отпечатки на телефоне изменились. Введите мастер-пароль и снова включите вход по отпечатку в настройках учётки.</string>
-    <string name="biometric_section">Вход по отпечатку</string>
+    <string name="biometric_failed">Не удалось проверить биометрию — введите мастер-пароль</string>
+    <string name="biometric_invalidated">Биометрия на телефоне изменилась. Введите мастер-пароль и снова включите разблокировку биометрией в настройках.</string>
+    <string name="biometric_section">Биометрия</string>
     <string name="biometric_switch">Разблокировать по отпечатку или лицу</string>
-    <string name="biometric_hint">Мастер-ключ хранится на телефоне в защищённом хранилище и открывается только отпечатком. Тот, кто знает PIN телефона и сможет приложить ваш палец, откроет хранилище. При утере телефона смените мастер-пароль: прежний ключ перестанет действовать.</string>
+    <string name="biometric_hint">Мастер-ключ хранится на телефоне в защищённом хранилище и открывается только биометрией. Тот, кто знает PIN телефона и сможет приложить ваш палец, откроет хранилище. При утере телефона смените мастер-пароль: прежний ключ перестанет действовать.</string>
     <string name="biometric_unavailable">На телефоне нет надёжной биометрии или не добавлен отпечаток.</string>
-    <string name="biometric_enabled">Вход по отпечатку включён</string>
-    <string name="password_changed_biometric_off">Пароль изменён. Вход по отпечатку выключен — включите его снова.</string>
+    <string name="biometric_enabled">Разблокировка биометрией включена</string>
+    <string name="password_changed_biometric_off">Пароль изменён. Разблокировка биометрией выключена — включите её снова.</string>
 
     <!-- Смена временного пароля -->
     <string name="password_change_title">Новый мастер-пароль</string>
-    <string name="password_change_subtitle">Учётка %1$s вошла с временным паролем. Задайте свой, чтобы открыть хранилище.</string>
+    <string name="password_change_subtitle">Аккаунт %1$s вошёл с временным паролем. Задайте свой, чтобы открыть хранилище.</string>
     <string name="new_master_password">Новый мастер-пароль</string>
     <string name="new_master_password_repeat">Новый мастер-пароль ещё раз</string>
     <string name="password_change_save">Сохранить пароль</string>
@@ -95,27 +95,34 @@
     <string name="kdf_downgrade_title">Параметры защиты ослаблены</string>
     <string name="kdf_downgrade_accept">Принять новые параметры</string>
 
-    <!-- Учётка -->
-    <string name="account">Учётка</string>
-    <string name="change_password">Смена мастер-пароля</string>
+    <!-- Настройки: аккаунт и безопасность -->
+    <string name="account">Настройки</string>
+    <string name="settings_title">Настройки</string>
+    <string name="account_section">Аккаунт</string>
+    <string name="security_section">Безопасность</string>
+    <string name="connection_open">Подключение и блокировка</string>
+    <string name="connection_open_hint">Адрес сервера, сертификат, автоблокировка</string>
+    <string name="vault_title">Хранилище</string>
+    <string name="secret_menu">Действия с записью</string>
+    <string name="change_password">Мастер-пароль</string>
     <string name="current_master_password">Текущий мастер-пароль</string>
-    <string name="change_password_hint">Все секреты будут перешифрованы. На других устройствах потребуется войти заново.</string>
-    <string name="change_password_button">Сменить пароль</string>
+    <string name="change_password_hint">Все записи будут перешифрованы. На других устройствах потребуется войти заново.</string>
+    <string name="change_password_button">Сменить мастер-пароль</string>
     <string name="change_password_busy">Перешифровка…</string>
     <string name="password_changed">Мастер-пароль изменён</string>
-    <string name="kdf_show">▸ Параметры Argon2id</string>
-    <string name="kdf_hide">▾ Параметры Argon2id</string>
+    <string name="kdf_show">▸ Сложность ключа (Argon2id)</string>
+    <string name="kdf_hide">▾ Сложность ключа (Argon2id)</string>
     <string name="kdf_time">Проходов (1–10)</string>
     <string name="kdf_memory">Память, MiB (19–1024)</string>
     <string name="kdf_hint">Больше — дороже перебор пароля при утечке базы, но медленнее разблокировка на всех устройствах.</string>
-    <string name="kdf_invalid">Параметры Argon2id — числа</string>
+    <string name="kdf_invalid">Сложность ключа — числа</string>
     <string name="sessions_section">Сеансы</string>
     <string name="logout_everywhere">Выйти на всех устройствах</string>
     <string name="logout_everywhere_short">Выйти везде</string>
-    <string name="logout_everywhere_hint">Завершает вход на всех устройствах, включая это, — например, если телефон или ноутбук потерян.</string>
+    <string name="logout_everywhere_hint">Завершает сеансы на всех устройствах, включая это, — например, если телефон или ноутбук потерян.</string>
     <string name="logout_everywhere_confirm">Чтобы снова открыть хранилище на любом устройстве, понадобится войти с логином и мастер-паролем.</string>
-    <string name="delete_account">Удалить учётку</string>
-    <string name="delete_account_text">Учётка %1$s и все её секреты будут удалены без возможности восстановления.</string>
+    <string name="delete_account">Удалить аккаунт</string>
+    <string name="delete_account_text">Аккаунт %1$s и все его записи будут удалены без возможности восстановления.</string>
     <string name="delete_account_type_login">Для подтверждения введите логин</string>
     <string name="delete_account_login_mismatch">Логин не совпадает</string>
     <string name="delete_account_confirm">Удалить навсегда</string>
@@ -123,9 +130,9 @@
     <!-- Автозаполнение -->
     <string name="autofill_choose">Shron: выбрать логин</string>
     <string name="autofill_title">Автозаполнение</string>
-    <string name="autofill_sign_in_first">Откройте Shron и войдите в учётку, чтобы заполнять пароли.</string>
+    <string name="autofill_sign_in_first">Откройте Shron и войдите в аккаунт, чтобы заполнять пароли.</string>
     <string name="autofill_open_app">Открыть Shron</string>
-    <string name="autofill_unlock">Заполнение для %1$s. Учётка: %2$s.</string>
+    <string name="autofill_unlock">Заполнение для %1$s. Аккаунт: %2$s.</string>
     <string name="autofill_fill_for">Заполнить: %1$s</string>
     <string name="autofill_no_logins">Логинов пока нет</string>
     <string name="autofill_nothing_found">Ничего не найдено — сотрите поиск, чтобы увидеть все логины</string>
@@ -134,57 +141,59 @@
     <string name="autofill_enabled">Shron выбран службой автозаполнения</string>
     <string name="autofill_enable">Выбрать Shron для автозаполнения</string>
 
-    <!-- Список секретов -->
-    <string name="action_add_secret">Добавить секрет</string>
+    <!-- Список записей -->
+    <string name="action_add_secret">Новая запись</string>
     <string name="action_lock">Заблокировать</string>
     <string name="action_more">Ещё</string>
     <string name="search">Поиск</string>
     <string name="search_clear">Очистить поиск</string>
     <string name="search_nothing_found">Ничего не найдено</string>
     <string name="filter_all">Все</string>
-    <string name="secrets_empty">Секретов пока нет. Нажмите ⊕, чтобы добавить первый.</string>
+    <string name="filter_all_types">Все типы</string>
+    <string name="filter_type">Тип: %1$s</string>
+    <string name="secrets_empty">Записей пока нет</string>
 
-    <!-- Типы секретов: полные названия — в списке, короткие — в переключателе формы -->
-    <string name="type_credentials">Логин и пароль</string>
-    <string name="type_text">Текст</string>
-    <string name="type_card">Карта</string>
+    <!-- Типы записей: полные названия — в списке, короткие — в переключателе формы -->
+    <string name="type_credentials">Логин</string>
+    <string name="type_text">Заметка</string>
+    <string name="type_card">Банковская карта</string>
     <string name="type_binary">Файл</string>
-    <string name="type_credentials_short">Пароль</string>
-    <string name="type_text_short">Текст</string>
+    <string name="type_credentials_short">Логин</string>
+    <string name="type_text_short">Заметка</string>
     <string name="type_card_short">Карта</string>
     <string name="type_binary_short">Файл</string>
 
-    <!-- Новый секрет -->
-    <string name="secret_new_title">Новый секрет</string>
+    <!-- Новая запись -->
+    <string name="secret_new_title">Новая запись</string>
     <string name="secret_name">Название</string>
     <string name="secret_name_hint">Например, почта или банк</string>
-    <string name="secret_group">Группа</string>
-    <string name="secret_group_hint">Необязательно; секреты одной группы идут в списке вместе</string>
-    <string name="group_none">Без группы</string>
-    <string name="group_expand">Развернуть группу</string>
-    <string name="group_collapse">Свернуть группу</string>
+    <string name="secret_group">Папка</string>
+    <string name="secret_group_hint">Необязательно; записи одной папки идут в списке вместе</string>
+    <string name="group_none">Без папки</string>
+    <string name="group_expand">Развернуть папку</string>
+    <string name="group_collapse">Свернуть папку</string>
     <string name="secret_metadata">Комментарий</string>
-    <string name="secret_metadata_hint">Необязательно; показывается в списке секретов</string>
+    <string name="secret_metadata_hint">Необязательно; показывается в списке</string>
     <string name="secret_login">Логин</string>
     <string name="secret_password">Пароль</string>
     <string name="secret_uris">Сайты и приложения</string>
     <string name="secret_uris_hint">Необязательно. По одному на строку: github.com или androidapp://com.github.android. По ним подбирается логин при автозаполнении.</string>
-    <string name="secret_text">Текст</string>
+    <string name="secret_text">Заметка</string>
     <string name="card_number">Номер карты</string>
-    <string name="card_holder">Держатель</string>
+    <string name="card_holder">Имя владельца</string>
     <string name="card_expiry">Срок действия (ММ/ГГ)</string>
-    <string name="card_cvv">CVV</string>
+    <string name="card_cvv">CVV/CVC</string>
     <string name="file_pick">Выбрать файл</string>
     <string name="file_none">Файл не выбран</string>
     <string name="file_selected">%1$s, %2$s</string>
     <string name="file_too_large">Файл слишком большой</string>
     <string name="file_current">Текущий файл, %1$s. Выберите новый, чтобы заменить.</string>
 
-    <!-- Изменение секрета -->
-    <string name="secret_edit_title">Изменить секрет</string>
+    <!-- Изменение записи -->
+    <string name="secret_edit_title">Изменить запись</string>
     <string name="secret_name_fixed">Название и тип изменить нельзя</string>
 
-    <!-- Просмотр секрета -->
+    <!-- Просмотр записи -->
     <string name="back">Назад</string>
     <string name="edit">Изменить</string>
     <string name="delete">Удалить</string>
@@ -195,8 +204,8 @@
     <string name="file_save">Сохранить файл…</string>
     <string name="file_saved">Файл сохранён</string>
     <string name="error_write_file">Не удалось записать файл</string>
-    <string name="created_at">Создан: %1$s</string>
-    <string name="updated_at">Изменён: %1$s</string>
-    <string name="delete_secret_title">Удалить секрет?</string>
-    <string name="delete_secret_text">«%1$s» будет удалён безвозвратно.</string>
+    <string name="created_at">Создано: %1$s</string>
+    <string name="updated_at">Изменено: %1$s</string>
+    <string name="delete_secret_title">Удалить запись?</string>
+    <string name="delete_secret_text">«%1$s» будет удалена безвозвратно.</string>
 </resources>

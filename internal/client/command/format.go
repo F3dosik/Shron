@@ -94,7 +94,7 @@ func WriteSecretList(secrets []*domain.SecretInfo, filter ListFilter) error {
 	})
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	if _, err := fmt.Fprintln(w, "ГРУППА\tИМЯ\tТИП\tМЕТАДАННЫЕ\tОБНОВЛЁН"); err != nil {
+	if _, err := fmt.Fprintln(w, "ПАПКА\tНАЗВАНИЕ\tТИП\tКОММЕНТАРИЙ\tИЗМЕНЕНО"); err != nil {
 		return err
 	}
 	for _, s := range filtered {
@@ -108,19 +108,19 @@ func WriteSecretList(secrets []*domain.SecretInfo, filter ListFilter) error {
 	return w.Flush()
 }
 
-// formatPretty форматирует секрет в человекочитаемом виде в зависимости от типа.
+// formatPretty форматирует запись в человекочитаемом виде в зависимости от типа.
 func formatPretty(info *domain.SecretInfo) ([]byte, error) {
 	var buf bytes.Buffer
-	fmt.Fprintf(&buf, "Имя:        %s\n", info.Name)
-	fmt.Fprintf(&buf, "Тип:        %s\n", info.Type)
+	fmt.Fprintf(&buf, "Название:    %s\n", info.Name)
+	fmt.Fprintf(&buf, "Тип:         %s\n", info.Type)
 	if info.Group != "" {
-		fmt.Fprintf(&buf, "Группа:     %s\n", info.Group)
+		fmt.Fprintf(&buf, "Папка:       %s\n", info.Group)
 	}
 	if info.Metadata != "" {
-		fmt.Fprintf(&buf, "Метаданные: %s\n", info.Metadata)
+		fmt.Fprintf(&buf, "Комментарий: %s\n", info.Metadata)
 	}
-	fmt.Fprintf(&buf, "Создан:     %s\n", info.CreatedAt.Format(time.RFC3339))
-	fmt.Fprintf(&buf, "Обновлён:   %s\n", info.UpdatedAt.Format(time.RFC3339))
+	fmt.Fprintf(&buf, "Создано:     %s\n", info.CreatedAt.Format(time.RFC3339))
+	fmt.Fprintf(&buf, "Изменено:    %s\n", info.UpdatedAt.Format(time.RFC3339))
 	fmt.Fprintln(&buf, "---")
 
 	switch info.Type {
@@ -161,7 +161,7 @@ func formatPretty(info *domain.SecretInfo) ([]byte, error) {
 		fmt.Fprintln(&buf, "Используйте --output=<path> для сохранения в файл")
 
 	default:
-		return nil, fmt.Errorf("неизвестный тип секрета: %s", info.Type)
+		return nil, fmt.Errorf("неизвестный тип записи: %s", info.Type)
 	}
 
 	return buf.Bytes(), nil

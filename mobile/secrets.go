@@ -168,7 +168,7 @@ func (a *App) GetFileContent(name string) ([]byte, error) {
 // SaveSecret создаёт (update == false) или изменяет секрет.
 func (a *App) SaveSecret(input *SecretInput, update bool) error {
 	if input == nil {
-		return validationError("Нет данных секрета")
+		return validationError("Нет данных записи")
 	}
 	v, err := a.currentVault()
 	if err != nil {
@@ -269,7 +269,7 @@ func (a *App) binaryContent(name string, content []byte, update bool) ([]byte, e
 func parseType(secretType string) (domain.SecretType, error) {
 	t, err := domain.ParseSecretType(secretType)
 	if err != nil {
-		return "", validationError("Неизвестный тип секрета")
+		return "", validationError("Неизвестный тип записи")
 	}
 	return t, nil
 }

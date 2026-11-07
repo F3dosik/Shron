@@ -114,7 +114,7 @@ func (a *App) GetSecret(name, secretType string) (*Secret, error) {
 	}
 	t, err := domain.ParseSecretType(secretType)
 	if err != nil {
-		return nil, validationError("Неизвестный тип секрета")
+		return nil, validationError("Неизвестный тип записи")
 	}
 	info, err := v.GetSecret(a.context(), name, t)
 	if err != nil {
@@ -147,7 +147,7 @@ func (a *App) DeleteSecret(name, secretType string) error {
 	}
 	t, err := domain.ParseSecretType(secretType)
 	if err != nil {
-		return validationError("Неизвестный тип секрета")
+		return validationError("Неизвестный тип записи")
 	}
 	return toUIError(v.DeleteSecret(a.context(), name, t))
 }
@@ -201,7 +201,7 @@ func (a *App) buildPayload(input SecretInput, update bool) (*domain.SecretPayloa
 	}
 	t, err := domain.ParseSecretType(input.Type)
 	if err != nil {
-		return nil, validationError("Неизвестный тип секрета")
+		return nil, validationError("Неизвестный тип записи")
 	}
 	group, err := domain.NormalizeGroup(input.Group)
 	if err != nil {

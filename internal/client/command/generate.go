@@ -76,7 +76,7 @@ func (c *Commands) newGenerateCmd() *cobra.Command {
 				return err
 			}
 			fmt.Println(result.Password)
-			fmt.Fprintf(os.Stderr, "Стойкость: %.0f бит (%s)\n", result.EntropyBits, passgen.Strength(result.EntropyBits))
+			fmt.Fprintf(os.Stderr, "Надёжность: %.0f бит (%s)\n", result.EntropyBits, passgen.Strength(result.EntropyBits))
 			return nil
 		},
 	}

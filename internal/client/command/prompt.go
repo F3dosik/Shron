@@ -37,7 +37,7 @@ const (
 	promptSecretCardCVV    = "CVV: "
 
 	//Промпты SecretMetadata.
-	promptSecretMD = "Введите дополнительную информацию для секрета (по желанию): "
+	promptSecretMD = "Комментарий (Enter — пропустить): "
 
 	// minPasswordLength — минимальная допустимая длина мастер-пароля.
 	minPasswordLength = 8
@@ -55,7 +55,7 @@ var (
 	// ErrPasswordTooShort возвращается, когда пароль короче минимально допустимой длины.
 	ErrPasswordTooShort = fmt.Errorf("пароль должен быть не короче %d символов", minPasswordLength)
 	// ErrUnknownSecretType возвращается, когда тип секрета не определен.
-	ErrUnknownSecretType = errors.New("неизвестный тип секрета")
+	ErrUnknownSecretType = errors.New("неизвестный тип записи")
 )
 
 // promptPassword выводит prompt и читает пароль со стандартного ввода без отображения

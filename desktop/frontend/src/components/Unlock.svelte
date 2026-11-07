@@ -46,7 +46,7 @@
 <div class="center-screen">
   <form class="card stack" onsubmit={submit}>
     <div>
-      <h1>🔒 Хранилище заблокировано</h1>
+      <h1>Хранилище заблокировано</h1>
       <p class="lead">{login}</p>
     </div>
     {#if message}<p class="muted" style="margin: 0">{message}</p>{/if}
@@ -66,9 +66,9 @@
     {/if}
     <button type="submit" class="primary" disabled={busy || !password}>Разблокировать</button>
     <div class="row">
-      <button type="button" class="link" onclick={onswitch}>Войти в другую учётку</button>
+      <button type="button" class="link" onclick={onswitch}>Войти в другой аккаунт</button>
       <span class="spacer"></span>
-      <button type="button" class="link" onclick={onsettings}>Настройки</button>
+      <button type="button" class="link" onclick={onsettings}>Подключение</button>
     </div>
   </form>
 </div>

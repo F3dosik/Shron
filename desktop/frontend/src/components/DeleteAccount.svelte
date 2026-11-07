@@ -25,9 +25,9 @@
   }
 </script>
 
-<Modal title="Удаление учётки" {onclose}>
+<Modal title="Удаление аккаунта" {onclose}>
   <form class="stack" onsubmit={submit}>
-    <p style="margin: 0">Учётка <b>{login}</b> и все её секреты будут удалены без возможности восстановления.</p>
+    <p style="margin: 0">Аккаунт <b>{login}</b> и все его записи будут удалены без возможности восстановления.</p>
     <label><span>Для подтверждения введите логин</span><input bind:value={typedLogin} autocomplete="off" spellcheck="false" /></label>
     <label><span>Мастер-пароль</span><PasswordInput bind:value={password} /></label>
     {#if error}<p class="error">{error}</p>{/if}

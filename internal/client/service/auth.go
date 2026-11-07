@@ -362,11 +362,11 @@ func (s *authService) DeleteAccount(ctx context.Context, login, password string)
 	}
 	// Логин освободился: новая учётка с тем же именем может иметь любые параметры.
 	if err := s.kdfPins.Forget(s.server, login); err != nil {
-		return fmt.Errorf("authService.DeleteAccount: учётка удалена: %w", err)
+		return fmt.Errorf("authService.DeleteAccount: аккаунт удалён: %w", err)
 	}
 
 	if err := os.Remove(s.sessionPath); err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("authService.DeleteAccount: учётка удалена, но не удалось удалить сессию: %w", err)
+		return fmt.Errorf("authService.DeleteAccount: аккаунт удалён, но не удалось удалить сеанс: %w", err)
 	}
 	s.tokens.SetToken("")
 	return nil
