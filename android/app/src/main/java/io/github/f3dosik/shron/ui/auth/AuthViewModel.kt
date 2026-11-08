@@ -133,7 +133,7 @@ class AuthViewModel(app: ShronApplication) : CoreViewModel(app) {
 
     fun refreshBiometric() {
         val state = core.state.value
-        biometricReady = app.biometric.isAvailable() && app.biometric.isEnabled(state.serverAddress, state.login)
+        biometricReady = app.biometric.isAvailable() && app.biometric.isEnabled(state.serverAddress, state.biometricAccount)
     }
 
     /**
@@ -177,6 +177,15 @@ class AuthViewModel(app: ShronApplication) : CoreViewModel(app) {
 
     fun biometricError(message: String) {
         error = ShronError(Mobile.CodeInternal, message)
+    }
+
+    /** Создаёт хранилище без сервера с паролем из полей [password] и [confirm]. */
+    fun createStandalone() = run {
+        if (password != confirm) throw validation(R.string.passwords_mismatch)
+        core.call { it.createStandalone(password) }
+        password = ""
+        confirm = ""
+        generated = null
     }
 
     fun logout() = run {

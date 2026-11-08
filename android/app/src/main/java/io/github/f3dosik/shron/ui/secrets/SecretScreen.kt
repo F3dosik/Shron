@@ -75,7 +75,8 @@ fun SecretScreen(
     var confirmMoveToDevice by remember { mutableStateOf(false) }
     var menu by remember { mutableStateOf(false) }
     val secret = vm.secret
-    val offline = vm.coreState.collectAsStateWithLifecycle().value.offline
+    val coreState by vm.coreState.collectAsStateWithLifecycle()
+    val offline = coreState.offline
 
     Scaffold(
         topBar = {
@@ -98,13 +99,16 @@ fun SecretScreen(
                             }
                             DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                                 val local = secret.status == Mobile.StatusLocal
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(if (local) R.string.move_to_server else R.string.move_to_device)) },
-                                    onClick = {
-                                        menu = false
-                                        if (local) vm.setLocal(false) else confirmMoveToDevice = true
-                                    },
-                                )
+                                // Без сервера все записи и так на телефоне.
+                                if (!coreState.standalone) {
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(if (local) R.string.move_to_server else R.string.move_to_device)) },
+                                        onClick = {
+                                            menu = false
+                                            if (local) vm.setLocal(false) else confirmMoveToDevice = true
+                                        },
+                                    )
+                                }
                                 DropdownMenuItem(
                                     text = { Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error) },
                                     leadingIcon = {

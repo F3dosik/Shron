@@ -98,3 +98,45 @@ func TestE2E_Vault_LocalRecords(t *testing.T) {
 	_, err = offline.Load(filepath.Join(dir, offline.FileName))
 	require.Error(t, err)
 }
+
+func TestE2E_Vault_ImportStandalone(t *testing.T) {
+	ctx := context.Background()
+	dir := t.TempDir()
+	standalonePath := filepath.Join(dir, offline.StandaloneFileName)
+
+	// Хранилище без сервера.
+	local, err := vault.Open(vault.Config{Standalone: true, CachePath: standalonePath})
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = local.Close() })
+	require.NoError(t, local.CreateStandalone("standalone-pw", domain.DefaultKDFParams))
+	require.NoError(t, local.CreateSecret(ctx, credentials("mail", "me", "pw-local", "mail.example")))
+	require.NoError(t, local.CreateSecret(ctx, credentials("seed", "me", "words", "wallet.example")))
+	require.NoError(t, local.Close())
+
+	// Аккаунт на сервере, где уже есть запись с тем же названием.
+	account, _, _ := newVaultUserAt(t, filepath.Join(dir, "session"), func(cfg *vault.Config) {
+		cfg.CachePath = filepath.Join(dir, offline.FileName)
+	})
+	require.NoError(t, account.CreateSecret(ctx, credentials("mail", "me", "pw-server", "mail.example")))
+	assert.Equal(t, 2, account.StandaloneRecords(standalonePath))
+
+	_, err = account.ImportStandalone(ctx, standalonePath, "wrong-password", "с телефона")
+	require.ErrorIs(t, err, vault.ErrWrongPassword)
+	n, err := account.ImportStandalone(ctx, standalonePath, "standalone-pw", "с телефона")
+	require.NoError(t, err)
+	assert.Equal(t, 2, n)
+	assert.Equal(t, 0, account.StandaloneRecords(standalonePath))
+	_, err = offline.Load(standalonePath)
+	require.Error(t, err, "перенесённое хранилище удаляется")
+
+	list, err := account.ListSecrets(ctx)
+	require.NoError(t, err)
+	assert.Len(t, list, 3)
+	seed, err := account.GetSecret(ctx, "seed", domain.SecretTypeCredentials)
+	require.NoError(t, err)
+	assert.Contains(t, string(seed.Data), "words")
+	mail, err := account.GetSecret(ctx, "mail", domain.SecretTypeCredentials)
+	require.NoError(t, err)
+	assert.Contains(t, string(mail.Data), "pw-server", "запись аккаунта не перезаписана")
+	assert.Equal(t, vault.StatusSynced, statusOf(t, account, "seed"))
+}

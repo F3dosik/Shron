@@ -237,3 +237,89 @@ func TestGenerate(t *testing.T) {
 	_, err = GeneratePassphrase(2)
 	assert.Equal(t, CodeValidation, decodeError(t, err).Code)
 }
+
+func TestApp_Standalone(t *testing.T) {
+	dir := t.TempDir()
+	app, err := NewApp(dir, true, nil)
+	require.NoError(t, err)
+	t.Cleanup(app.Close)
+	assert.False(t, app.GetState().Configured)
+
+	require.NoError(t, app.UseStandalone(5))
+	state := app.GetState()
+	assert.True(t, state.Configured)
+	assert.True(t, state.Standalone)
+	assert.False(t, state.HasStandaloneVault)
+
+	require.Error(t, app.CreateStandalone("short"))
+	require.NoError(t, app.CreateStandalone("password-1"))
+	state = app.GetState()
+	assert.True(t, state.HasStandaloneVault)
+	assert.True(t, state.Unlocked)
+	assert.Empty(t, state.Login)
+
+	require.NoError(t, app.SaveSecret(&SecretInput{Name: "note", Type: TypeText, Text: "hello"}, false))
+	list, err := app.ListSecrets()
+	require.NoError(t, err)
+	require.Equal(t, 1, list.Len())
+
+	// Настройки переживают перезапуск.
+	app.Close()
+	app, err = NewApp(dir, true, nil)
+	require.NoError(t, err)
+	assert.True(t, app.GetState().Standalone)
+	require.NoError(t, app.Unlock("password-1"))
+	s, err := app.GetSecret("note", TypeText)
+	require.NoError(t, err)
+	assert.Equal(t, "hello", s.Text)
+
+	err = app.Logout(false)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), CodeNotSupported)
+}
+
+func newStandaloneApp(t *testing.T) *App {
+	t.Helper()
+	app, err := NewApp(t.TempDir(), true, nil)
+	require.NoError(t, err)
+	t.Cleanup(app.Close)
+	require.NoError(t, app.UseStandalone(5))
+	require.NoError(t, app.CreateStandalone("password-1"))
+	return app
+}
+
+func TestApp_ExportImport(t *testing.T) {
+	src := newStandaloneApp(t)
+	require.NoError(t, src.SaveSecret(&SecretInput{Name: "note", Type: TypeText, Text: "hello"}, false))
+	require.NoError(t, src.SaveSecret(&SecretInput{Name: "mail", Type: TypeCredentials, Login: "me", Password: "pw"}, false))
+	assert.True(t, strings.HasSuffix(src.ExportFileName(), ".gkx"))
+
+	_, err := src.ExportVault("short")
+	require.Error(t, err)
+	data, err := src.ExportVault("export-password")
+	require.NoError(t, err)
+
+	dst := newStandaloneApp(t)
+	require.NoError(t, dst.SaveSecret(&SecretInput{Name: "note", Type: TypeText, Text: "old"}, false))
+
+	_, err = dst.ImportVault(data, "wrong-password", false)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), CodeWrongPassword)
+	_, err = dst.ImportVault([]byte("not an export"), "export-password", false)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), CodeValidation)
+
+	result, err := dst.ImportVault(data, "export-password", false)
+	require.NoError(t, err)
+	assert.Equal(t, 2, result.Total)
+	assert.Equal(t, 1, result.Created)
+	assert.Equal(t, 1, result.Skipped)
+	assert.False(t, result.Interrupted)
+
+	result, err = dst.ImportVault(data, "export-password", true)
+	require.NoError(t, err)
+	assert.Equal(t, 2, result.Updated)
+	note, err := dst.GetSecret("note", TypeText)
+	require.NoError(t, err)
+	assert.Equal(t, "hello", note.Text)
+}

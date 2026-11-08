@@ -83,6 +83,7 @@ fun SecretsScreen(
     var menu by remember { mutableStateOf(false) }
     var confirmLogout by remember { mutableStateOf(false) }
     var recoverStale by remember { mutableStateOf(false) }
+    var importStandalone by remember { mutableStateOf(false) }
     val coreState by vm.coreState.collectAsStateWithLifecycle()
 
     Scaffold(
@@ -102,7 +103,7 @@ fun SecretsScreen(
                                 text = { Text(stringResource(R.string.settings_title)) },
                                 onClick = { menu = false; onSettings() },
                             )
-                            DropdownMenuItem(
+                            if (!coreState.standalone) DropdownMenuItem(
                                 text = { Text(stringResource(R.string.logout)) },
                                 onClick = {
                                     menu = false
@@ -127,7 +128,12 @@ fun SecretsScreen(
         ) {
             if (coreState.offline) OfflineBanner(coreState.syncedAt, coreState.pendingChanges)
             if (coreState.conflicts > 0) ConflictsBanner(coreState.conflicts, onConflicts)
-            if (coreState.staleLocalRecords > 0) StaleLocalBanner(coreState.staleLocalRecords, onClick = { recoverStale = true })
+            if (coreState.staleLocalRecords > 0) {
+                PasswordBanner(stringResource(R.string.stale_local_banner, coreState.staleLocalRecords), onClick = { recoverStale = true })
+            }
+            if (coreState.standaloneRecords > 0) {
+                PasswordBanner(stringResource(R.string.standalone_import_banner, coreState.standaloneRecords), onClick = { importStandalone = true })
+            }
             PullToRefreshBox(
                 isRefreshing = vm.busy,
                 onRefresh = vm::refresh,
@@ -180,10 +186,29 @@ fun SecretsScreen(
     }
 
     if (recoverStale && coreState.staleLocalRecords > 0) {
-        RecoverStaleDialog(vm, coreState.staleLocalRecords, onDismiss = {
+        val dismiss = {
             recoverStale = false
             vm.dismissError()
-        })
+        }
+        RecordsPasswordDialog(
+            vm, staleTexts, coreState.staleLocalRecords,
+            onConfirm = { vm.recoverStale(it, dismiss) },
+            onDiscard = { vm.discardStale(dismiss) },
+            onDismiss = dismiss,
+        )
+    }
+
+    if (importStandalone && coreState.standaloneRecords > 0) {
+        val dismiss = {
+            importStandalone = false
+            vm.dismissError()
+        }
+        RecordsPasswordDialog(
+            vm, importTexts, coreState.standaloneRecords,
+            onConfirm = { vm.importStandalone(it, dismiss) },
+            onDiscard = { vm.discardStandalone(dismiss) },
+            onDismiss = dismiss,
+        )
     }
 
     if (confirmLogout) {
@@ -367,9 +392,9 @@ private fun SecretRow(item: SecretItem, onClick: () -> Unit) {
     )
 }
 
-/** Плашка записей устройства, зашифрованных прежним паролем: по нажатию — ввод прежнего пароля. */
+/** Плашка во всю ширину: по нажатию — ввод пароля, чтобы вернуть или перенести записи. */
 @Composable
-private fun StaleLocalBanner(count: Int, onClick: () -> Unit) {
+private fun PasswordBanner(text: String, onClick: () -> Unit) {
     Surface(
         color = MaterialTheme.colorScheme.tertiaryContainer,
         modifier = Modifier
@@ -383,7 +408,7 @@ private fun StaleLocalBanner(count: Int, onClick: () -> Unit) {
         ) {
             Icon(Icons.Filled.Lock, contentDescription = null, tint = MaterialTheme.colorScheme.onTertiaryContainer)
             Text(
-                stringResource(R.string.stale_local_banner, count),
+                text,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onTertiaryContainer,
                 modifier = Modifier.weight(1f),
@@ -393,23 +418,53 @@ private fun StaleLocalBanner(count: Int, onClick: () -> Unit) {
     }
 }
 
+/** Тексты [RecordsPasswordDialog]. */
+private class PasswordDialogTexts(
+    @StringRes val title: Int,
+    @StringRes val text: Int,
+    @StringRes val password: Int,
+    @StringRes val confirm: Int,
+    @StringRes val discard: Int,
+    @StringRes val discardTitle: Int,
+    @StringRes val discardText: Int,
+)
+
+private val staleTexts = PasswordDialogTexts(
+    R.string.stale_local_title, R.string.stale_local_text, R.string.stale_local_password, R.string.stale_local_recover,
+    R.string.stale_local_discard, R.string.stale_local_discard_title, R.string.stale_local_discard_text,
+)
+
+private val importTexts = PasswordDialogTexts(
+    R.string.standalone_import_title, R.string.standalone_import_text, R.string.standalone_import_password,
+    R.string.standalone_import, R.string.standalone_discard, R.string.standalone_discard_title,
+    R.string.standalone_discard_text,
+)
+
 /**
- * Возврат записей устройства прежним паролем; если его не вспомнить — удаление
- * (с подтверждением).
+ * Записи, которые открываются другим паролем (прежним паролем аккаунта или паролем
+ * хранилища без сервера): ввести его — [onConfirm]; если его не вспомнить, удалить записи
+ * — [onDiscard] (с подтверждением).
  */
 @Composable
-private fun RecoverStaleDialog(vm: SecretsViewModel, count: Int, onDismiss: () -> Unit) {
+private fun RecordsPasswordDialog(
+    vm: SecretsViewModel,
+    texts: PasswordDialogTexts,
+    count: Int,
+    onConfirm: (String) -> Unit,
+    onDiscard: () -> Unit,
+    onDismiss: () -> Unit,
+) {
     var password by remember { mutableStateOf("") }
     var confirmDiscard by remember { mutableStateOf(false) }
     if (confirmDiscard) {
         AlertDialog(
             onDismissRequest = { confirmDiscard = false },
-            title = { Text(stringResource(R.string.stale_local_discard_title)) },
-            text = { Text(stringResource(R.string.stale_local_discard_text, count)) },
+            title = { Text(stringResource(texts.discardTitle)) },
+            text = { Text(stringResource(texts.discardText, count)) },
             confirmButton = {
                 TextButton(onClick = {
                     confirmDiscard = false
-                    vm.discardStale(onDismiss)
+                    onDiscard()
                 }) { Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = {
@@ -420,25 +475,25 @@ private fun RecoverStaleDialog(vm: SecretsViewModel, count: Int, onDismiss: () -
     }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.stale_local_title)) },
+        title = { Text(stringResource(texts.title)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(stringResource(R.string.stale_local_text))
+                Text(stringResource(texts.text))
                 PasswordInput(
                     value = password,
                     onValueChange = { password = it },
-                    label = stringResource(R.string.stale_local_password),
+                    label = stringResource(texts.password),
                     enabled = !vm.busy,
                 )
                 vm.error?.let { Text(it.message, color = MaterialTheme.colorScheme.error) }
                 TextButton(onClick = { confirmDiscard = true }, enabled = !vm.busy) {
-                    Text(stringResource(R.string.stale_local_discard), color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(texts.discard), color = MaterialTheme.colorScheme.error)
                 }
             }
         },
         confirmButton = {
-            TextButton(onClick = { vm.recoverStale(password, onDismiss) }, enabled = !vm.busy && password.isNotEmpty()) {
-                Text(stringResource(R.string.stale_local_recover))
+            TextButton(onClick = { onConfirm(password) }, enabled = !vm.busy && password.isNotEmpty()) {
+                Text(stringResource(texts.confirm))
             }
         },
         dismissButton = {

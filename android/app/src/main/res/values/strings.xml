@@ -177,6 +177,49 @@
     <string name="logout_local_title">Есть записи только на этом устройстве</string>
     <string name="logout_local_text">Записей только на этом устройстве: %1$d. После выхода они удалятся с телефона, а на сервере их нет. Чтобы сохранить, сначала перенесите их на сервер.</string>
 
+    <!-- Экспорт и импорт -->
+    <string name="transfer_section">Экспорт и импорт</string>
+    <string name="transfer_hint">Файл .gkx со всеми записями, зашифрованный отдельным паролем экспорта. Его можно сохранить куда угодно — в Загрузки, облако, на флешку — и импортировать на любом устройстве, в том числе на десктопе и в CLI. Без сервера это единственная резервная копия записей.</string>
+    <string name="export_action">Экспорт</string>
+    <string name="import_action">Импорт</string>
+    <string name="export_title">Экспорт хранилища</string>
+    <string name="export_text">Придумайте пароль экспорта (не короче 8 символов). Он нужен, чтобы открыть файл; мастер-пароль для этого не нужен. Без пароля экспорта файл не открыть.</string>
+    <string name="export_password">Пароль экспорта</string>
+    <string name="export_password_repeat">Пароль экспорта ещё раз</string>
+    <string name="export_choose_file">Выбрать файл</string>
+    <string name="export_saved">Экспорт сохранён</string>
+    <string name="import_title">Импорт записей</string>
+    <string name="import_text">Файл: %1$s. Введите пароль экспорта, с которым он сохранён.</string>
+    <string name="import_overwrite">Заменять записи с тем же названием</string>
+    <string name="import_too_large">Файл слишком большой для экспорта Shron</string>
+    <string name="import_result">Импорт: создано %1$d, обновлено %2$d, пропущено %3$d, ошибок %4$d.</string>
+    <string name="import_interrupted">Прерван: %1$s</string>
+
+    <!-- Хранилище без сервера -->
+    <string name="mode_server">С сервером</string>
+    <string name="mode_standalone">Без сервера</string>
+    <string name="standalone_mode_subtitle">Записи хранятся только на этом телефоне. Здесь же — автоблокировка.</string>
+    <string name="standalone_mode_hint">Записи хранятся только на этом телефоне, зашифрованные мастер-паролем. Сервер не нужен, но и синхронизации с другими устройствами нет: если телефон потеряется, сломается или Shron будет удалён, записи пропадут. Сервер можно подключить позже — записи перенесутся в аккаунт.</string>
+    <string name="standalone_connect_hint">После подключения войдите в аккаунт или создайте его: записи с телефона можно будет перенести в аккаунт паролем хранилища без сервера.</string>
+    <string name="standalone_account">без сервера</string>
+    <string name="standalone_create_title">Хранилище на телефоне</string>
+    <string name="standalone_create_subtitle">Придумайте мастер-пароль. Он шифрует записи на телефоне.</string>
+    <string name="standalone_create_warning">Мастер-пароль нельзя восстановить: если его забыть, записи не открыть. Запишите его и храните отдельно от телефона.</string>
+    <string name="standalone_create">Создать хранилище</string>
+    <string name="standalone_settings_headline">Без сервера</string>
+    <string name="standalone_settings_hint">Записи хранятся только на этом телефоне</string>
+    <string name="connection_open_hint_standalone">Подключить сервер, автоблокировка</string>
+    <string name="delete_standalone">Удалить хранилище</string>
+    <string name="delete_standalone_text">Хранилище на телефоне и все его записи будут удалены без возможности восстановления.</string>
+    <string name="standalone_import_banner">Записей в хранилище без сервера: %1$d. Нажмите, чтобы перенести их в этот аккаунт.</string>
+    <string name="standalone_import_title">Перенести записи в аккаунт</string>
+    <string name="standalone_import_text">Введите мастер-пароль хранилища без сервера. Записи сохранятся в аккаунте; если название уже занято, к нему добавится «с телефона». После переноса хранилище без сервера удалится.</string>
+    <string name="standalone_import_password">Пароль хранилища без сервера</string>
+    <string name="standalone_import">Перенести</string>
+    <string name="standalone_discard">Удалить хранилище</string>
+    <string name="standalone_discard_title">Удалить хранилище без сервера?</string>
+    <string name="standalone_discard_text">Записи (%1$d) удалятся с телефона навсегда.</string>
+
     <!-- Записи только на этом устройстве -->
     <string name="secret_local_only">Только на этом устройстве</string>
     <string name="secret_local_only_hint">Запись не отправится на сервер и не появится на других устройствах. Если телефон потеряется или вы выйдете из аккаунта, она пропадёт.</string>

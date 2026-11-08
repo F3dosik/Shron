@@ -93,6 +93,10 @@ func toError(err error) error {
 			"Так подменённый сервер мог бы облегчить подбор мастер-пароля; пароль не отправлен. "+
 			"Принимайте новые параметры, только если сами сменили пароль с ними на другом устройстве.",
 			downgrade.Received, downgrade.Known)
+	case errors.Is(err, vault.ErrStandalone):
+		message = "Без сервера это недоступно"
+	case errors.Is(err, vault.ErrLocalUnavailable):
+		message = "Записи только на устройстве недоступны: нет копии хранилища"
 	case errors.Is(err, domain.ErrInvalidCardNumber):
 		code, message = CodeValidation, "Неверный номер карты"
 	case errors.Is(err, domain.ErrInvalidCardExpiry):

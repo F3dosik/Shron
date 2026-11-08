@@ -33,7 +33,22 @@ data class CoreState(
     val localRecords: Int = 0,
     /** Записи только на этом устройстве, зашифрованные прежним паролем (сменён на другом устройстве). */
     val staleLocalRecords: Int = 0,
-)
+    /** Хранилище без сервера; [hasStandaloneVault] — оно уже создано. */
+    val standalone: Boolean = false,
+    val hasStandaloneVault: Boolean = false,
+    /** Записи хранилища без сервера, которые можно перенести в аккаунт. */
+    val standaloneRecords: Int = 0,
+) {
+    /** Есть что разблокировать: аккаунт на сервере или созданное хранилище без сервера. */
+    val signedIn: Boolean get() = if (standalone) hasStandaloneVault else login.isNotEmpty()
+
+    /** Учётка для ключа биометрии: у хранилища без сервера логина нет. */
+    val biometricAccount: String get() = if (standalone) STANDALONE_ACCOUNT else login
+
+    companion object {
+        const val STANDALONE_ACCOUNT = "standalone"
+    }
+}
 
 /** Логин для подсказки автозаполнения — копия mobile.LoginMatch. */
 data class LoginMatch(val name: String, val login: String, val password: String)
@@ -151,6 +166,9 @@ class ShronCore(dataDir: File, insecure: Boolean) {
             conflicts = if (s.unlocked) s.conflicts.toInt() else 0,
             localRecords = s.localRecords.toInt(),
             staleLocalRecords = if (s.unlocked) s.staleLocalRecords.toInt() else 0,
+            standalone = s.standalone,
+            hasStandaloneVault = s.hasStandaloneVault,
+            standaloneRecords = if (s.unlocked) s.standaloneRecords.toInt() else 0,
         )
     }
 }

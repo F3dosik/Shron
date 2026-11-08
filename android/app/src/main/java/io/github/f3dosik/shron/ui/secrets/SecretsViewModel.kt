@@ -101,6 +101,19 @@ class SecretsViewModel(app: ShronApplication) : CoreViewModel(app) {
         onDone()
     }
 
+    /** Переносит в аккаунт записи хранилища без сервера с паролем [password]. */
+    fun importStandalone(password: String, onDone: () -> Unit) = run {
+        core.call { it.importStandalone(password) }
+        loadItems()
+        onDone()
+    }
+
+    /** Удаляет хранилище без сервера, оставшееся после подключения к серверу. */
+    fun discardStandalone(onDone: () -> Unit) = run {
+        core.call { it.discardStandalone() }
+        onDone()
+    }
+
     /** Удаляет записи устройства, зашифрованные прежним паролем. */
     fun discardStale(onDone: () -> Unit) = run {
         core.call { it.discardStaleLocalRecords() }

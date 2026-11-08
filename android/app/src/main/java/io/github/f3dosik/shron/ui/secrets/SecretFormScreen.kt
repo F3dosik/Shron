@@ -113,7 +113,7 @@ fun SecretFormScreen(vm: SecretFormViewModel, onSaved: (SecretRef) -> Unit, onCl
         )
 
         // Где хранить запись, выбирается при создании; потом — переносом в карточке записи.
-        if (!vm.editing) {
+        if (!vm.editing && !vm.coreState.collectAsStateWithLifecycle().value.standalone) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Column(Modifier.weight(1f)) {
                     Text(stringResource(R.string.secret_local_only), style = MaterialTheme.typography.bodyLarge)

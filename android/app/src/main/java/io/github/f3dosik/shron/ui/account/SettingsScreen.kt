@@ -2,6 +2,8 @@ package io.github.f3dosik.shron.ui.account
 
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -41,6 +43,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -63,10 +66,12 @@ import io.github.f3dosik.shron.ui.server.AutofillSection
  */
 fun SettingsScreen(
     vm: AccountViewModel,
+    transfer: TransferViewModel,
     login: String,
     serverAddress: String,
     onBack: () -> Unit,
     onConnection: () -> Unit,
+    standalone: Boolean = false,
 ) {
     BackHandler(onBack = onBack)
     val snackbar = remember { SnackbarHostState() }
@@ -74,6 +79,12 @@ fun SettingsScreen(
         vm.notice?.let {
             snackbar.showSnackbar(it)
             vm.noticeShown()
+        }
+    }
+    LaunchedEffect(transfer.notice) {
+        transfer.notice?.let {
+            snackbar.showSnackbar(it)
+            transfer.noticeShown()
         }
     }
     var confirmLogoutAll by remember { mutableStateOf(false) }
@@ -104,8 +115,16 @@ fun SettingsScreen(
         ) {
             SectionTitle(stringResource(R.string.account_section))
             ListItem(
-                headlineContent = { Text(login) },
-                supportingContent = { Text(stringResource(R.string.server_label, serverAddress)) },
+                headlineContent = { Text(if (standalone) stringResource(R.string.standalone_settings_headline) else login) },
+                supportingContent = {
+                    Text(
+                        if (standalone) {
+                            stringResource(R.string.standalone_settings_hint)
+                        } else {
+                            stringResource(R.string.server_label, serverAddress)
+                        },
+                    )
+                },
                 leadingContent = { Icon(Icons.Filled.AccountCircle, contentDescription = null) },
             )
 
@@ -114,7 +133,9 @@ fun SettingsScreen(
             BiometricSection(vm, enabled)
             ListItem(
                 headlineContent = { Text(stringResource(R.string.connection_open)) },
-                supportingContent = { Text(stringResource(R.string.connection_open_hint)) },
+                supportingContent = {
+                    Text(stringResource(if (standalone) R.string.connection_open_hint_standalone else R.string.connection_open_hint))
+                },
                 trailingContent = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) },
                 modifier = Modifier.clickable(enabled = enabled, onClick = onConnection),
             )
@@ -125,23 +146,28 @@ fun SettingsScreen(
             }
 
             HorizontalDivider()
-            ChangePasswordSection(vm, enabled)
+            TransferSection(transfer, enabled)
 
             HorizontalDivider()
-            Text(stringResource(R.string.sessions_section), style = MaterialTheme.typography.titleMedium)
-            Text(
-                stringResource(R.string.logout_everywhere_hint),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            OutlinedButton(onClick = { confirmLogoutAll = true }, enabled = enabled, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(R.string.logout_everywhere))
+            ChangePasswordSection(vm, enabled)
+
+            if (!standalone) {
+                HorizontalDivider()
+                Text(stringResource(R.string.sessions_section), style = MaterialTheme.typography.titleMedium)
+                Text(
+                    stringResource(R.string.logout_everywhere_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                OutlinedButton(onClick = { confirmLogoutAll = true }, enabled = enabled, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.logout_everywhere))
+                }
             }
 
             HorizontalDivider()
-            Text(stringResource(R.string.delete_account), style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(if (standalone) R.string.delete_standalone else R.string.delete_account), style = MaterialTheme.typography.titleMedium)
             Text(
-                stringResource(R.string.delete_account_text, login),
+                if (standalone) stringResource(R.string.delete_standalone_text) else stringResource(R.string.delete_account_text, login),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -153,7 +179,7 @@ fun SettingsScreen(
                 enabled = enabled,
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
                 modifier = Modifier.fillMaxWidth(),
-            ) { Text(stringResource(R.string.delete_account)) }
+            ) { Text(stringResource(if (standalone) R.string.delete_standalone else R.string.delete_account)) }
         }
     }
 
@@ -181,7 +207,7 @@ fun SettingsScreen(
     }
 
     if (confirmDelete) {
-        DeleteAccountDialog(vm, login, onDismiss = {
+        DeleteAccountDialog(vm, if (standalone) null else login, onDismiss = {
             confirmDelete = false
             vm.resetDeleteForm()
         })
@@ -224,6 +250,118 @@ private fun BiometricSection(vm: AccountViewModel, enabled: Boolean) {
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
+}
+
+/** Экспорт в файл .gkx и импорт из него; файл выбирается системным диалогом. */
+@Composable
+private fun TransferSection(vm: TransferViewModel, enabled: Boolean) {
+    val context = LocalContext.current
+    val pauseLock = rememberExternalActivity()
+    var exportDialog by remember { mutableStateOf(false) }
+    val save = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
+        vm.saveExport(context.contentResolver, uri)
+    }
+    val open = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) vm.pickImport(context.contentResolver, uri)
+    }
+
+    Text(stringResource(R.string.transfer_section), style = MaterialTheme.typography.titleMedium)
+    Text(
+        stringResource(R.string.transfer_hint),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedButton(
+            onClick = {
+                vm.resetExport()
+                exportDialog = true
+            },
+            enabled = enabled && !vm.busy,
+            modifier = Modifier.weight(1f),
+        ) { Text(stringResource(R.string.export_action)) }
+        OutlinedButton(
+            onClick = {
+                pauseLock()
+                open.launch(arrayOf("*/*"))
+            },
+            enabled = enabled && !vm.busy,
+            modifier = Modifier.weight(1f),
+        ) { Text(stringResource(R.string.import_action)) }
+    }
+    if (vm.importFile == null) ErrorMessage(vm.error.takeIf { !exportDialog })
+
+    if (exportDialog) {
+        AlertDialog(
+            onDismissRequest = { if (!vm.busy) exportDialog = false },
+            title = { Text(stringResource(R.string.export_title)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(stringResource(R.string.export_text))
+                    PasswordInput(
+                        value = vm.exportPassword,
+                        onValueChange = { vm.exportPassword = it },
+                        label = stringResource(R.string.export_password),
+                        enabled = !vm.busy,
+                    )
+                    PasswordInput(
+                        value = vm.exportConfirm,
+                        onValueChange = { vm.exportConfirm = it },
+                        label = stringResource(R.string.export_password_repeat),
+                        enabled = !vm.busy,
+                    )
+                    ErrorMessage(vm.error)
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        vm.prepareExport { name ->
+                            exportDialog = false
+                            pauseLock()
+                            save.launch(name)
+                        }
+                    },
+                    enabled = !vm.busy && vm.exportPassword.isNotEmpty(),
+                ) { Text(stringResource(R.string.export_choose_file)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { exportDialog = false }, enabled = !vm.busy) { Text(stringResource(R.string.cancel)) }
+            },
+        )
+    }
+
+    val file = vm.importFile
+    if (file != null) {
+        AlertDialog(
+            onDismissRequest = { if (!vm.busy) vm.cancelImport() },
+            title = { Text(stringResource(R.string.import_title)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(stringResource(R.string.import_text, file.name))
+                    PasswordInput(
+                        value = vm.importPassword,
+                        onValueChange = { vm.importPassword = it },
+                        label = stringResource(R.string.export_password),
+                        enabled = !vm.busy,
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(stringResource(R.string.import_overwrite), modifier = Modifier.weight(1f))
+                        Switch(checked = vm.importOverwrite, onCheckedChange = { vm.importOverwrite = it }, enabled = !vm.busy)
+                    }
+                    ErrorMessage(vm.error)
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = vm::confirmImport, enabled = !vm.busy && vm.importPassword.isNotEmpty()) {
+                    Text(stringResource(R.string.import_action))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = vm::cancelImport, enabled = !vm.busy) { Text(stringResource(R.string.cancel)) }
+            },
+        )
+    }
 }
 
 @Composable
@@ -302,21 +440,26 @@ private fun ChangePasswordSection(vm: AccountViewModel, enabled: Boolean) {
     )
 }
 
-/** Удаление учётки: как на десктопе, нужно ввести логин и мастер-пароль. */
+/**
+ * Удаление учётки: как на десктопе, нужно ввести логин и мастер-пароль. [login] == null —
+ * хранилище без сервера: логина нет, хватает пароля.
+ */
 @Composable
-private fun DeleteAccountDialog(vm: AccountViewModel, login: String, onDismiss: () -> Unit) {
+private fun DeleteAccountDialog(vm: AccountViewModel, login: String?, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = { if (!vm.busy) onDismiss() },
-        title = { Text(stringResource(R.string.delete_account)) },
+        title = { Text(stringResource(if (login == null) R.string.delete_standalone else R.string.delete_account)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(stringResource(R.string.delete_account_text, login))
-                TextInput(
-                    value = vm.deleteLogin,
-                    onValueChange = { vm.deleteLogin = it },
-                    label = stringResource(R.string.delete_account_type_login),
-                    enabled = !vm.busy,
-                )
+                Text(if (login == null) stringResource(R.string.delete_standalone_text) else stringResource(R.string.delete_account_text, login))
+                if (login != null) {
+                    TextInput(
+                        value = vm.deleteLogin,
+                        onValueChange = { vm.deleteLogin = it },
+                        label = stringResource(R.string.delete_account_type_login),
+                        enabled = !vm.busy,
+                    )
+                }
                 PasswordInput(
                     value = vm.deletePassword,
                     onValueChange = { vm.deletePassword = it },
@@ -329,7 +472,7 @@ private fun DeleteAccountDialog(vm: AccountViewModel, login: String, onDismiss: 
         confirmButton = {
             TextButton(
                 onClick = { vm.deleteAccount(login) },
-                enabled = !vm.busy && vm.deleteLogin.trim() == login && vm.deletePassword.isNotEmpty(),
+                enabled = !vm.busy && (login == null || vm.deleteLogin.trim() == login) && vm.deletePassword.isNotEmpty(),
             ) { Text(stringResource(R.string.delete_account_confirm), color = MaterialTheme.colorScheme.error) }
         },
         dismissButton = {

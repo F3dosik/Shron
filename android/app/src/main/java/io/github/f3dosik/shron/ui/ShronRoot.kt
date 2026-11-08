@@ -12,7 +12,10 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.f3dosik.shron.ShronApplication
 import io.github.f3dosik.shron.ui.account.SettingsScreen
 import io.github.f3dosik.shron.ui.account.AccountViewModel
+import io.github.f3dosik.shron.ui.account.TransferViewModel
 import io.github.f3dosik.shron.ui.auth.AuthViewModel
+import io.github.f3dosik.shron.ui.auth.CreateStandaloneScreen
+import io.github.f3dosik.shron.ui.common.accountName
 import io.github.f3dosik.shron.ui.auth.KdfDowngradeDialog
 import io.github.f3dosik.shron.ui.auth.PasswordChangeScreen
 import io.github.f3dosik.shron.ui.auth.SignInScreen
@@ -91,11 +94,15 @@ fun ShronRoot(app: ShronApplication) {
             )
         }
 
-        state.login.isEmpty() -> SignInScreen(auth, state.serverAddress, nav::openServerSettings)
+        state.standalone && !state.hasStandaloneVault -> CreateStandaloneScreen(auth, nav::openServerSettings)
+
+        state.login.isEmpty() && !state.standalone -> SignInScreen(auth, state.serverAddress, nav::openServerSettings)
 
         !state.unlocked && auth.temporaryPassword != null -> PasswordChangeScreen(auth, state.login)
 
-        !state.unlocked -> UnlockScreen(auth, state.login, state.lockReason, nav::openServerSettings)
+        !state.unlocked -> UnlockScreen(
+            auth, accountName(state), state.lockReason, nav::openServerSettings, standalone = state.standalone,
+        )
 
         else -> when (val route = nav.route) {
             VaultRoute.List -> {
@@ -135,10 +142,13 @@ fun ShronRoot(app: ShronApplication) {
 
             VaultRoute.Settings -> {
                 val vm: AccountViewModel = viewModel(key = "settings-$session") { AccountViewModel(app) }
+                val transfer: TransferViewModel = viewModel(key = "transfer-$session") { TransferViewModel(app) }
                 SettingsScreen(
                     vm = vm,
+                    transfer = transfer,
                     login = state.login,
                     serverAddress = state.serverAddress,
+                    standalone = state.standalone,
                     onBack = { nav.open(VaultRoute.List) },
                     onConnection = nav::openServerSettings,
                 )

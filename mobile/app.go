@@ -51,11 +51,18 @@ const (
 
 // State — текущее состояние приложения.
 type State struct {
-	// Configured — задан адрес сервера.
-	Configured      bool
-	ServerAddress   string
-	HasCACert       bool
-	AutoLockMinutes int
+	// Configured — задан адрес сервера или выбрано хранилище без сервера.
+	Configured bool
+	// Standalone — хранилище без сервера; HasStandaloneVault — оно уже создано (иначе
+	// нужен CreateStandalone). Login в этом режиме пустой.
+	Standalone         bool
+	HasStandaloneVault bool
+	// StandaloneRecords — записи хранилища без сервера, которые можно перенести в
+	// аккаунт после подключения к серверу (ImportStandalone).
+	StandaloneRecords int
+	ServerAddress     string
+	HasCACert         bool
+	AutoLockMinutes   int
 	// Login — текущая учётка; пустой — нужен вход.
 	Login string
 	// Unlocked — хранилище разблокировано.
@@ -106,7 +113,7 @@ func NewApp(dataDir string, insecure bool, listener LockListener) (*App, error) 
 		return nil, toError(err)
 	}
 	a := &App{dir: dataDir, insecure: insecure, listener: listener, settings: s}
-	if s.ServerAddress != "" {
+	if s.ServerAddress != "" || s.Standalone {
 		_ = a.openVaultLocked()
 	}
 	return a, nil
@@ -128,7 +135,8 @@ func (a *App) GetState() *State {
 	defer a.mu.Unlock()
 
 	state := &State{
-		Configured:      a.settings.ServerAddress != "",
+		Configured:      a.settings.ServerAddress != "" || a.settings.Standalone,
+		Standalone:      a.settings.Standalone,
 		ServerAddress:   a.settings.ServerAddress,
 		AutoLockMinutes: a.settings.AutoLockMinutes,
 	}
@@ -144,6 +152,8 @@ func (a *App) GetState() *State {
 		state.PendingChanges, state.Conflicts = a.vault.PendingChanges()
 		state.LocalRecords = a.vault.LocalRecords()
 		state.StaleLocalRecords = a.vault.StaleLocalRecords()
+		state.HasStandaloneVault = a.vault.HasStandaloneVault()
+		state.StandaloneRecords = a.vault.StandaloneRecords(a.standalonePath())
 	}
 	return state
 }
@@ -381,6 +391,19 @@ func (a *App) dialVaultLocked() error {
 	if err != nil {
 		return toError(err)
 	}
+	if a.settings.Standalone {
+		v, err := vault.Open(vault.Config{
+			Standalone:    true,
+			CachePath:     a.standalonePath(),
+			AutoLockAfter: time.Duration(a.settings.AutoLockMinutes) * time.Minute,
+			OnLock:        a.onLock,
+		})
+		if err != nil {
+			return toError(err)
+		}
+		a.vault = v
+		return nil
+	}
 	v, err := vault.Open(vault.Config{
 		ServerAddress: a.settings.ServerAddress,
 		CACertPEM:     caPEM,
@@ -389,17 +412,25 @@ func (a *App) dialVaultLocked() error {
 		CachePath:     filepath.Join(a.dir, offline.FileName),
 		OfflineWrites: true,
 		AutoLockAfter: time.Duration(a.settings.AutoLockMinutes) * time.Minute,
-		OnLock: func(reason vault.LockReason) {
-			if a.listener != nil {
-				a.listener.OnLock(string(reason))
-			}
-		},
+		OnLock:        a.onLock,
 	})
 	if err != nil {
 		return toError(err)
 	}
 	a.vault = v
 	return nil
+}
+
+// onLock передаёт блокировку слушателю приложения.
+func (a *App) onLock(reason vault.LockReason) {
+	if a.listener != nil {
+		a.listener.OnLock(string(reason))
+	}
+}
+
+// standalonePath — файл хранилища без сервера.
+func (a *App) standalonePath() string {
+	return filepath.Join(a.dir, offline.StandaloneFileName)
 }
 
 // resolveCACert возвращает сертификат для подключения: сохранённый (useSavedCA)

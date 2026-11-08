@@ -60,7 +60,11 @@ type Config struct {
 	// SessionPath — файл сессии (логин и токен).
 	SessionPath string
 	// CachePath — файл копии хранилища для работы без сервера; пустой — без копии.
+	// С Standalone — файл хранилища без сервера (обязателен).
 	CachePath string
+	// Standalone — хранилище без сервера (см. CreateStandalone): ServerAddress,
+	// SessionPath и параметры сервера не используются.
+	Standalone bool
 	// OfflineWrites — без сервера ставить изменения в очередь и отправлять их при
 	// подключении (с разрешением конфликтов, см. Conflicts). Без него без сервера
 	// хранилище только для чтения. Включать, только если интерфейс показывает конфликты.
@@ -144,6 +148,15 @@ func Open(cfg Config) (*Vault, error) {
 		cfg.OfflineRetryAfter = offlineRetryAfter
 	}
 
+	if cfg.Standalone {
+		if cfg.CachePath == "" {
+			return nil, errors.New("vault: standalone vault needs CachePath")
+		}
+		cache := newCachedClient(nil, cfg.CachePath, cfg.OfflineRetryAfter, false)
+		cache.standalone = true
+		return &Vault{cfg: cfg, tokens: grpcclient.NewTokenStore(""), auth: standaloneAuth{}, cache: cache}, nil
+	}
+
 	var login, token string
 	sess, err := session.Load(cfg.SessionPath)
 	switch {
@@ -186,6 +199,9 @@ func (v *Vault) Close() error {
 	v.mu.Lock()
 	v.lockLocked()
 	v.mu.Unlock()
+	if v.conn == nil {
+		return nil
+	}
 	return v.conn.Close()
 }
 
@@ -222,6 +238,9 @@ func (v *Vault) Register(ctx context.Context, login, password string, kdf domain
 // passwordChangeRequired == true: хранилище остаётся заблокированным, а получить доступ
 // можно только через CompletePasswordChange.
 func (v *Vault) SignIn(ctx context.Context, login, password string) (passwordChangeRequired bool, err error) {
+	if v.standalone() {
+		return false, ErrStandalone
+	}
 	ctx, cancel := context.WithTimeout(ctx, v.cfg.RequestTimeout)
 	defer cancel()
 
@@ -282,6 +301,9 @@ func (v *Vault) CompletePasswordChange(ctx context.Context, temporaryPassword, n
 
 // Unlock разблокирует хранилище паролем текущей учётки (после блокировки или запуска).
 func (v *Vault) Unlock(ctx context.Context, password string) error {
+	if v.standalone() {
+		return v.unlockStandalone(password)
+	}
 	v.mu.Lock()
 	login := v.login
 	v.mu.Unlock()
@@ -304,6 +326,10 @@ func (v *Vault) UnlockWithKey(ctx context.Context, masterKey []byte) error {
 	key := bytes.Clone(masterKey)
 	v.mu.Lock()
 	defer v.mu.Unlock()
+	if v.standalone() {
+		v.lockLocked()
+		return v.unlockStandaloneWithKeyLocked(key)
+	}
 	if v.login == "" {
 		clear(key)
 		return ErrNotSignedIn
@@ -614,6 +640,9 @@ func (v *Vault) DeleteSecret(ctx context.Context, name string, secretType domain
 // и оставляет хранилище разблокированным новым паролем. Остальные устройства
 // после смены должны войти заново.
 func (v *Vault) ChangePassword(ctx context.Context, oldPassword, newPassword string, kdf domain.KDFParams) error {
+	if v.standalone() {
+		return v.changeStandalonePassword(oldPassword, newPassword, kdf)
+	}
 	// Перешифровать нужно ровно то, что на сервере, а не копию на устройстве.
 	// Сначала — отправить изменения, сделанные без сети: после смены пароля их уже не
 	// расшифровать.
@@ -673,6 +702,9 @@ func (v *Vault) Logout(ctx context.Context, allSessions bool) error {
 
 // DeleteAccount безвозвратно удаляет учётку со всеми секретами после проверки пароля.
 func (v *Vault) DeleteAccount(ctx context.Context, password string) error {
+	if v.standalone() {
+		return v.deleteStandalone(password)
+	}
 	ctx, cancel := context.WithTimeout(ctx, v.cfg.RequestTimeout)
 	defer cancel()
 

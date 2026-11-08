@@ -22,6 +22,8 @@ const defaultAutoLockMinutes = 5
 type settings struct {
 	// ServerAddress — адрес сервера (host:port); пустой — приложение не настроено.
 	ServerAddress string `json:"serverAddress"`
+	// Standalone — хранилище без сервера (offline.StandaloneFileName); ServerAddress пустой.
+	Standalone bool `json:"standalone,omitempty"`
 	// AutoLockMinutes — блокировка после бездействия, минут; 0 — не блокировать.
 	AutoLockMinutes int `json:"autoLockMinutes"`
 }

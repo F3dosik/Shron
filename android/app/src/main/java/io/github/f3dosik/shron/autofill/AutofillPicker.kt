@@ -36,6 +36,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import io.github.f3dosik.shron.ui.common.accountName
 import io.github.f3dosik.shron.R
 import io.github.f3dosik.shron.ShronApplication
 import io.github.f3dosik.shron.ui.auth.AuthViewModel
@@ -67,7 +68,7 @@ fun AutofillPicker(
 
     when {
         // Временный пароль меняется в приложении: там экран смены с подтверждением.
-        state.login.isEmpty() || auth.temporaryPassword != null -> FormScreen(
+        !state.signedIn || auth.temporaryPassword != null -> FormScreen(
             title = stringResource(R.string.autofill_title),
             subtitle = stringResource(R.string.autofill_sign_in_first),
         ) {
@@ -77,7 +78,7 @@ fun AutofillPicker(
 
         !state.unlocked -> FormScreen(
             title = stringResource(R.string.autofill_title),
-            subtitle = stringResource(R.string.autofill_unlock, requester, state.login),
+            subtitle = stringResource(R.string.autofill_unlock, requester, accountName(state)),
         ) {
             PasswordInput(
                 value = auth.password,

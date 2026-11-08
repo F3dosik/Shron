@@ -33,11 +33,18 @@ class ServerViewModel(app: ShronApplication) : CoreViewModel(app) {
     var checkResult by mutableStateOf<String?>(null)
         private set
 
+    /** Без сервера: записи только на телефоне. */
+    var standalone by mutableStateOf(false)
+
+    /** Выбор режима доступен, пока нет аккаунта на сервере (из него сначала нужно выйти). */
+    val canChooseMode: Boolean get() = core.state.value.let { it.standalone || it.login.isEmpty() }
+
     init {
         val s = core.state.value
         address = s.serverAddress
         autoLockMinutes = if (s.configured) s.autoLockMinutes.toString() else DEFAULT_AUTO_LOCK.toString()
         ca = if (s.hasCACert) CaSource.Saved else CaSource.System
+        standalone = s.standalone
     }
 
     fun useSystemCA() {
@@ -59,7 +66,11 @@ class ServerViewModel(app: ShronApplication) : CoreViewModel(app) {
 
     fun save(onSaved: () -> Unit) = run {
         val minutes = autoLockMinutes.trim().toLongOrNull() ?: throw validation(R.string.server_auto_lock_invalid)
-        core.call { it.saveSettings(address, caPem(), ca == CaSource.Saved, minutes) }
+        if (standalone) {
+            core.call { it.useStandalone(minutes) }
+        } else {
+            core.call { it.saveSettings(address, caPem(), ca == CaSource.Saved, minutes) }
+        }
         app.preferences.backgroundLockSeconds = backgroundLockSeconds
         onSaved()
     }

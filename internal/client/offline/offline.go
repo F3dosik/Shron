@@ -13,6 +13,9 @@
 // (Snapshot.Local): они зашифрованы так же, но на сервер не отправляются. Поэтому файл
 // с такими записями нельзя просто удалить: если его подпись не сходится (пароль сменили
 // на другом устройстве), он откладывается (Archive) до ввода прежнего пароля.
+//
+// Тот же формат хранит хранилище без сервера (Snapshot.Standalone, файл StandaloneFileName):
+// все его записи — в Local, соль и параметры Argon2id созданы на устройстве.
 package offline
 
 import (
@@ -31,6 +34,9 @@ import (
 
 // FileName — имя файла копии; лежит рядом с файлом сессии.
 const FileName = "offline_vault.json"
+
+// StandaloneFileName — имя файла хранилища без сервера.
+const StandaloneFileName = "local_vault.json"
 
 // StaleSuffix — суффикс отложенной копии (Archive): записи только на этом устройстве,
 // зашифрованные прежним паролем.
@@ -70,12 +76,14 @@ type Snapshot struct {
 	// Local — записи только на этом устройстве: на сервер не отправляются, в Records
 	// не попадают. Blind index не пересекается с записями сервера, которые видит клиент.
 	Local []Record `json:"local,omitempty"`
+	// Standalone — хранилище без сервера: Server и Login пустые, все записи — в Local.
+	Standalone bool `json:"standalone,omitempty"`
 }
 
 // Empty сообщает, что в копии нет ничего, кроме сведений об учётке: записи с сервера
 // ни разу не получены, изменений и записей только на устройстве нет.
 func (s *Snapshot) Empty() bool {
-	return s.SyncedAt.IsZero() && len(s.Pending) == 0 && len(s.Local) == 0
+	return !s.Standalone && s.SyncedAt.IsZero() && len(s.Pending) == 0 && len(s.Local) == 0
 }
 
 // OpKind — вид изменения без сервера.
