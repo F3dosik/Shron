@@ -44,6 +44,17 @@ type SecretsService interface {
 	// Используется при смене пароля.
 	Reencrypt(ctx context.Context, newMasterKey []byte) ([]domain.ReencryptedSecret, error)
 
+	// BlindIndex вычисляет blind index секрета с именем name и типом secretType.
+	BlindIndex(name string, secretType domain.SecretType) string
+
+	// Seal шифрует payload так же, как CreateSecret, и возвращает blind index и данные,
+	// не отправляя их на сервер (например, для очереди изменений без сети).
+	Seal(payload *domain.SecretPayload) (blindIndex string, data []byte, err error)
+
+	// Open расшифровывает данные записи с blind index и проверяет их целостность,
+	// как GetSecret, без обращения к серверу.
+	Open(blindIndex string, data []byte) (*domain.SecretPayload, error)
+
 	// Wipe обнуляет ключ blind index и отпускает шифр. После вызова сервис непригоден.
 	// Ключ AES внутри шифра стандартной библиотеки обнулить нельзя: он станет мусором
 	// и будет собран сборщиком, поэтому Wipe уменьшает, но не исключает время жизни
@@ -266,6 +277,29 @@ func (s *secretsService) Reencrypt(ctx context.Context, newMasterKey []byte) ([]
 		})
 	}
 	return result, nil
+}
+
+// BlindIndex вычисляет blind index секрета.
+func (s *secretsService) BlindIndex(name string, secretType domain.SecretType) string {
+	return crypto.BlindIndex(name, secretType, s.hmacKey)
+}
+
+// Seal шифрует payload без отправки на сервер.
+func (s *secretsService) Seal(payload *domain.SecretPayload) (string, []byte, error) {
+	data, err := s.encryptPayload(payload)
+	if err != nil {
+		return "", nil, fmt.Errorf("secretsService.Seal: %w", err)
+	}
+	return s.BlindIndex(payload.Name, payload.Type), data, nil
+}
+
+// Open расшифровывает данные записи без обращения к серверу.
+func (s *secretsService) Open(blindIndex string, data []byte) (*domain.SecretPayload, error) {
+	payload, err := s.decryptPayload(blindIndex, data)
+	if err != nil {
+		return nil, fmt.Errorf("secretsService.Open: %w", err)
+	}
+	return payload, nil
 }
 
 // Wipe обнуляет ключи сервиса.

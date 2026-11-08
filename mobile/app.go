@@ -65,6 +65,10 @@ type State struct {
 	// SyncedAt — когда копия на устройстве последний раз получила записи с сервера,
 	// миллисекунды Unix; 0 — копии нет.
 	SyncedAt int64
+	// PendingChanges — изменения, сделанные без сети и ещё не отправленные;
+	// Conflicts — сколько из них ждут решения пользователя (см. Conflicts).
+	PendingChanges int
+	Conflicts      int
 }
 
 // App — клиент Shron.
@@ -131,6 +135,7 @@ func (a *App) GetState() *State {
 		offline, syncedAt := a.vault.Offline()
 		state.Offline = offline
 		state.SyncedAt = unixMilli(syncedAt)
+		state.PendingChanges, state.Conflicts = a.vault.PendingChanges()
 	}
 	return state
 }

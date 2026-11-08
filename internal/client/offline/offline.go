@@ -53,7 +53,65 @@ type Snapshot struct {
 	KDF  domain.KDFParams `json:"kdf"`
 	// SyncedAt — когда записи последний раз получены с сервера.
 	SyncedAt time.Time `json:"syncedAt"`
-	Records  []Record  `json:"records"`
+	// Records — записи, как они были на сервере при последнем обращении к нему.
+	Records []Record `json:"records"`
+	// Pending — изменения, сделанные без сервера и ещё не отправленные: по одному на
+	// запись, в порядке первого изменения. Список показывает записи с их учётом.
+	Pending []PendingOp `json:"pending,omitempty"`
+}
+
+// OpKind — вид изменения без сервера.
+type OpKind string
+
+// Виды изменений.
+const (
+	OpCreate OpKind = "create"
+	OpUpdate OpKind = "update"
+	OpDelete OpKind = "delete"
+)
+
+// PendingOp — изменение записи, сделанное без сервера.
+type PendingOp struct {
+	Kind       OpKind `json:"kind"`
+	BlindIndex string `json:"blindIndex"`
+	// Data — новые зашифрованные данные (create, update); для delete — данные удалённой
+	// записи, чтобы показать её в конфликте. На сервер для delete не отправляются.
+	Data []byte `json:"data"`
+	// BaseHash — SHA-256 шифротекста записи на сервере, с которой начато изменение
+	// (update, delete). Шифротекст меняется при каждом изменении (случайный nonce),
+	// поэтому другой хеш на сервере значит, что запись изменили на другом устройстве.
+	BaseHash []byte `json:"baseHash,omitempty"`
+	// EditedAt — когда изменение сделано на устройстве.
+	EditedAt time.Time `json:"editedAt"`
+	// Conflict — изменение не отправлено из-за конфликта; ждёт решения пользователя.
+	Conflict *Conflict `json:"conflict,omitempty"`
+}
+
+// ConflictKind — причина конфликта.
+type ConflictKind string
+
+// Причины конфликта.
+const (
+	// ConflictChanged — запись изменили и на устройстве, и на сервере.
+	ConflictChanged ConflictKind = "changed"
+	// ConflictDeletedOnServer — запись изменили на устройстве, а на сервере удалили.
+	ConflictDeletedOnServer ConflictKind = "deleted_on_server"
+	// ConflictExists — запись создали на устройстве, а на сервере уже есть такая.
+	ConflictExists ConflictKind = "exists"
+	// ConflictChangedOnServer — запись удалили на устройстве, а на сервере изменили.
+	ConflictChangedOnServer ConflictKind = "changed_on_server"
+	// ConflictRejected — сервер отклонил изменение (например, превышен лимит).
+	ConflictRejected ConflictKind = "rejected"
+)
+
+// Conflict — сведения о конфликте.
+type Conflict struct {
+	Kind ConflictKind `json:"kind"`
+	// ServerData и ServerUpdatedAt — версия записи на сервере; пустые, если её там нет.
+	ServerData      []byte    `json:"serverData,omitempty"`
+	ServerUpdatedAt time.Time `json:"serverUpdatedAt,omitempty"`
+	// Message — текст ошибки сервера для ConflictRejected.
+	Message string `json:"message,omitempty"`
 }
 
 // file — формат файла: подписанное тело и подпись.

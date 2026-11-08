@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -134,11 +135,16 @@ func TestE2E_Vault_Offline(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "github", info.Name)
 
-	// Без сервера — только чтение.
+	// Без сервера изменения встают в очередь и сразу видны в списке.
 	time.Sleep(150 * time.Millisecond)
-	err = v.CreateSecret(ctx, credentials("gitlab", "me", "pw-2", "gitlab.com"))
-	assert.Equal(t, vault.CodeUnavailable, vault.ErrorCode(err))
+	require.NoError(t, v.CreateSecret(ctx, credentials("gitlab", "me", "pw-2", "gitlab.com")))
 	assert.True(t, v.IsUnlocked(), "сбой сети не блокирует хранилище")
+	pending, conflicts := v.PendingChanges()
+	assert.Equal(t, 1, pending)
+	assert.Zero(t, conflicts)
+	list, err = v.ListSecrets(ctx)
+	require.NoError(t, err)
+	require.Len(t, list, 2)
 
 	// Мастер-ключ (биометрия) без сервера проверяется по копии.
 	v.Lock()
@@ -155,7 +161,11 @@ func TestE2E_Vault_Offline(t *testing.T) {
 		offlineNow, _ := v.Offline()
 		return err == nil && !offlineNow
 	}, 30*time.Second, 200*time.Millisecond)
-	require.NoError(t, v.CreateSecret(ctx, credentials("gitlab", "me", "pw-2", "gitlab.com")))
+	pending, _ = v.PendingChanges()
+	assert.Zero(t, pending, "очередь отправлена при возврате сети")
+	info, err = v.GetSecret(ctx, "gitlab", domain.SecretTypeCredentials)
+	require.NoError(t, err)
+	assert.Equal(t, "gitlab", info.Name)
 	assert.Equal(t, vault.LockManual, locks.last(), "после возврата сети хранилище не блокируется")
 	assert.True(t, v.IsUnlocked())
 
@@ -211,6 +221,84 @@ func TestE2E_Mobile_Offline(t *testing.T) {
 	require.Equal(t, 1, matches.Len())
 	assert.Equal(t, "pw-1", matches.Get(0).Password)
 
-	err = app.SaveSecret(&mobile.SecretInput{Name: "new", Type: mobile.TypeText, Text: "x"}, false)
-	assert.Equal(t, mobile.CodeUnavailable, mobileCode(t, err))
+	require.NoError(t, app.SaveSecret(&mobile.SecretInput{Name: "new", Type: mobile.TypeText, Text: "x"}, false))
+	assert.Equal(t, 1, app.GetState().PendingChanges)
+	list, err := app.ListSecrets()
+	require.NoError(t, err)
+	statuses := map[string]string{}
+	for i := 0; i < list.Len(); i++ {
+		statuses[list.Get(i).Name] = list.Get(i).Status
+	}
+	assert.Equal(t, map[string]string{"bank": mobile.StatusSynced, "new": mobile.StatusPending}, statuses)
+}
+
+// TestE2E_Vault_OfflineConflict: телефон без сети меняет запись, которую тем временем
+// изменили на другом устройстве; при подключении — конфликт и его решения.
+func TestE2E_Vault_OfflineConflict(t *testing.T) {
+	ctx := context.Background()
+	proxy := startProxy(t, serverAddr)
+	dir := t.TempDir()
+	phone, _, login := newVaultUserAt(t, filepath.Join(dir, "session"), func(cfg *vault.Config) {
+		cfg.ServerAddress = proxy.addr
+		cfg.CachePath = filepath.Join(dir, offline.FileName)
+		cfg.OfflineRetryAfter = 100 * time.Millisecond
+	})
+	laptop, _ := openVault(t, filepath.Join(t.TempDir(), "session"), nil)
+	_, err := laptop.SignIn(ctx, login, "vault-password-1")
+	require.NoError(t, err)
+
+	require.NoError(t, phone.CreateSecret(ctx, credentials("mail", "me", "pw-1", "mail.example")))
+	require.NoError(t, phone.CreateSecret(ctx, credentials("bank", "me", "pw-1", "bank.example")))
+	_, err = phone.ListSecrets(ctx)
+	require.NoError(t, err)
+
+	proxy.Stop()
+	require.NoError(t, phone.UpdateSecret(ctx, credentials("mail", "me", "pw-phone", "mail.example")))
+	require.NoError(t, phone.UpdateSecret(ctx, credentials("bank", "me", "pw-phone", "bank.example")))
+	require.NoError(t, laptop.UpdateSecret(ctx, credentials("mail", "me", "pw-laptop", "mail.example")))
+	require.NoError(t, laptop.UpdateSecret(ctx, credentials("bank", "me", "pw-laptop", "bank.example")))
+
+	proxy.Start()
+	require.Eventually(t, func() bool {
+		_, err := phone.ListSecrets(ctx)
+		_, conflicts := phone.PendingChanges()
+		return err == nil && conflicts == 2
+	}, 30*time.Second, 200*time.Millisecond)
+
+	conflicts, err := phone.Conflicts()
+	require.NoError(t, err)
+	require.Len(t, conflicts, 2)
+	for _, c := range conflicts {
+		assert.Equal(t, offline.ConflictChanged, c.Kind)
+		assert.Contains(t, string(c.Mine.Data), "pw-phone")
+		assert.Contains(t, string(c.Server.Data), "pw-laptop")
+		assert.False(t, c.ServerUpdatedAt.IsZero())
+		assert.Len(t, c.Resolutions, 3)
+	}
+
+	require.NoError(t, phone.ResolveConflict(ctx, "mail", domain.SecretTypeCredentials, vault.ResolveMine, "с телефона"))
+	require.NoError(t, phone.ResolveConflict(ctx, "bank", domain.SecretTypeCredentials, vault.ResolveBoth, "с телефона"))
+	err = phone.ResolveConflict(ctx, "bank", domain.SecretTypeCredentials, vault.ResolveMine, "с телефона")
+	assert.Equal(t, vault.CodeNoConflict, vault.ErrorCode(err))
+	pending, _ := phone.PendingChanges()
+	assert.Zero(t, pending)
+
+	mail, err := laptop.GetSecret(ctx, "mail", domain.SecretTypeCredentials)
+	require.NoError(t, err)
+	assert.Contains(t, string(mail.Data), "pw-phone")
+	bank, err := laptop.GetSecret(ctx, "bank", domain.SecretTypeCredentials)
+	require.NoError(t, err)
+	assert.Contains(t, string(bank.Data), "pw-laptop")
+	list, err := laptop.ListSecrets(ctx)
+	require.NoError(t, err)
+	var copyName string
+	for _, s := range list {
+		if strings.HasPrefix(s.Name, "bank (с телефона, ") {
+			copyName = s.Name
+		}
+	}
+	require.NotEmpty(t, copyName, "копия версии с телефона")
+	copied, err := laptop.GetSecret(ctx, copyName, domain.SecretTypeCredentials)
+	require.NoError(t, err)
+	assert.Contains(t, string(copied.Data), "pw-phone")
 }

@@ -23,6 +23,10 @@ var (
 	// ErrKeyRejected — сервер не принял сохранённый мастер-ключ: пароль сменили
 	// (например, на другом устройстве). Ключ больше не годится, нужен пароль.
 	ErrKeyRejected = errors.New("master key rejected")
+	// ErrNoConflict — у записи нет конфликта, который можно так разрешить.
+	ErrNoConflict = errors.New("no such conflict")
+	// ErrUnsyncedChanges — операции мешают неотправленные изменения или конфликты.
+	ErrUnsyncedChanges = errors.New("unsynced offline changes")
 )
 
 // Code — категория ошибки для интерфейса: по ней приложение решает, что показать
@@ -49,6 +53,8 @@ const (
 	CodeBadCertificate         Code = "BAD_CERTIFICATE"
 	CodeNotSupported           Code = "NOT_SUPPORTED"
 	CodeInternal               Code = "INTERNAL"
+	CodeNoConflict             Code = "NO_CONFLICT"
+	CodeUnsyncedChanges        Code = "UNSYNCED_CHANGES"
 )
 
 // codes сопоставляет ошибки с категориями; порядок важен для обёрнутых ошибок.
@@ -61,6 +67,8 @@ var codes = []struct {
 	{ErrNotSignedIn, CodeNotSignedIn},
 	{ErrSessionExpired, CodeSessionExpired},
 	{ErrKeyRejected, CodeKeyRejected},
+	{ErrNoConflict, CodeNoConflict},
+	{ErrUnsyncedChanges, CodeUnsyncedChanges},
 	{domain.ErrPasswordChangeRequired, CodePasswordChangeRequired},
 	{service.ErrIntegrity, CodeIntegrity},
 	{domain.ErrKDFDowngrade, CodeKDFDowngrade},
