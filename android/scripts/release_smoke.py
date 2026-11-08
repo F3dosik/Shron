@@ -82,6 +82,22 @@ def visible_texts():
     return [n.get("text") for n in nodes() if n.get("text")]
 
 
+def dismiss_system_dialog():
+    """Закрывает системное окно «… isn't responding» (на эмуляторе в CI его показывает,
+    например, Pixel Launcher): оно закрывает экран приложения и к нему не относится."""
+    for node in nodes():
+        value = node.get("text") or ""
+        if value.endswith("isn't responding") or value.endswith("не отвечает"):
+            button = find("Wait") or find("Подождать")
+            if button is not None:
+                print(f"  закрываем системное окно «{value}»")
+                left, top, right, bottom = map(int, re.findall(r"\d+", button.get("bounds")))
+                adb("shell", "input", "tap", str((left + right) // 2), str((top + bottom) // 2))
+                time.sleep(1)
+            return True
+    return False
+
+
 def wait(text, substring=False, timeout=30):
     """Ждёт элемент. Если его нет на экране, листает вниз до конца, затем вверх: экран
     может быть прокручен так, что элемент за нижним или за верхним краем."""
@@ -89,6 +105,8 @@ def wait(text, substring=False, timeout=30):
     down = True
     while time.time() < deadline:
         check_alive()
+        if dismiss_system_dialog():
+            continue
         node = find(text, substring)
         if node is not None:
             print(f"  есть «{text}»")
