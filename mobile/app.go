@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/F3dosik/Shron/internal/client/grpcclient"
+	"github.com/F3dosik/Shron/internal/client/offline"
 	"github.com/F3dosik/Shron/internal/client/vault"
 	"github.com/F3dosik/Shron/internal/domain"
 	pb "github.com/F3dosik/Shron/proto/gen"
@@ -59,6 +60,11 @@ type State struct {
 	Login string
 	// Unlocked — хранилище разблокировано.
 	Unlocked bool
+	// Offline — сервер недоступен, записи показаны из копии на устройстве (только чтение).
+	Offline bool
+	// SyncedAt — когда копия на устройстве последний раз получила записи с сервера,
+	// миллисекунды Unix; 0 — копии нет.
+	SyncedAt int64
 }
 
 // App — клиент Shron.
@@ -122,6 +128,9 @@ func (a *App) GetState() *State {
 	if a.vault != nil {
 		state.Login = a.vault.CurrentLogin()
 		state.Unlocked = a.vault.IsUnlocked()
+		offline, syncedAt := a.vault.Offline()
+		state.Offline = offline
+		state.SyncedAt = unixMilli(syncedAt)
 	}
 	return state
 }
@@ -177,8 +186,9 @@ func (a *App) SaveSettings(address, caPEM string, useSavedCA bool, autoLockMinut
 		return toError(err)
 	}
 	if s.ServerAddress != a.settings.ServerAddress {
-		// Сессия принадлежит другому серверу.
+		// Сессия и копия хранилища принадлежат другому серверу.
 		_ = os.Remove(filepath.Join(a.dir, sessionFile))
+		_ = offline.Remove(filepath.Join(a.dir, offline.FileName))
 	}
 	a.settings = s
 	return a.openVaultLocked()
@@ -241,8 +251,8 @@ func (a *App) Unlock(password string) error {
 }
 
 // UnlockWithKey разблокирует хранилище текущей учётки мастер-ключом, полученным раньше
-// из MasterKey (на Android — расшифрованным ключом Keystore после биометрии). Нужен
-// сервер: по ключу выполняется вход. Ошибка CodeKeyRejected — пароль сменили, ключ
+// из MasterKey (на Android — расшифрованным ключом Keystore после биометрии). По ключу
+// выполняется вход на сервер; без сервера ключ проверяется по копии на устройстве. Ошибка CodeKeyRejected — пароль сменили, ключ
 // больше не годится: его нужно удалить и разблокировать паролем.
 func (a *App) UnlockWithKey(masterKey []byte) error {
 	v, err := a.currentVault()
@@ -353,6 +363,7 @@ func (a *App) dialVaultLocked() error {
 		CACertPEM:     caPEM,
 		Insecure:      a.insecure,
 		SessionPath:   filepath.Join(a.dir, sessionFile),
+		CachePath:     filepath.Join(a.dir, offline.FileName),
 		AutoLockAfter: time.Duration(a.settings.AutoLockMinutes) * time.Minute,
 		OnLock: func(reason vault.LockReason) {
 			if a.listener != nil {
