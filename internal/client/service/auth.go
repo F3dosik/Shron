@@ -85,7 +85,13 @@ type authService struct {
 	// сервера, к которому они относятся. nil — параметры не проверяются.
 	kdfPins *kdfpin.Store
 	server  string
+	// onUnlock вызывается после успешного Unlock; nil — не вызывается.
+	onUnlock UnlockHook
 }
+
+// UnlockHook получает соль и параметры Argon2id учётки после успешной проверки пароля
+// в Unlock — например, чтобы потом выводить мастер-ключ без сервера (офлайн-копия).
+type UnlockHook func(login string, salt []byte, kdf domain.KDFParams)
 
 // AuthOption настраивает authService.
 type AuthOption func(*authService)
@@ -95,6 +101,13 @@ type AuthOption func(*authService)
 func WithKDFPins(pins *kdfpin.Store, server string) AuthOption {
 	return func(s *authService) {
 		s.kdfPins, s.server = pins, server
+	}
+}
+
+// WithUnlockHook задаёт функцию, которую Unlock вызывает после успешной проверки пароля.
+func WithUnlockHook(hook UnlockHook) AuthOption {
+	return func(s *authService) {
+		s.onUnlock = hook
 	}
 }
 
@@ -186,7 +199,7 @@ func generateTemporaryPassword() (string, error) {
 // Запрашивает соль по логину, деривирует ключ аутентификации, получает JWT токен
 // и сохраняет сессию (логин + токен) в файл для последующих вызовов.
 func (s *authService) Login(ctx context.Context, login, password string) (bool, error) {
-	_, authKey, kdf, err := s.userKeys(ctx, login, password)
+	_, authKey, _, kdf, err := s.userKeys(ctx, login, password)
 	if err != nil {
 		return false, fmt.Errorf("authService.Login: %w", err)
 	}
@@ -217,7 +230,7 @@ func (s *authService) Login(ctx context.Context, login, password string) (bool, 
 // сохраняется в сессию и используется соединением, поэтому короткий срок жизни токена
 // не требует частого повторного входа.
 func (s *authService) Unlock(ctx context.Context, login, password string) ([]byte, error) {
-	masterKey, authKey, kdf, err := s.userKeys(ctx, login, password)
+	masterKey, authKey, salt, kdf, err := s.userKeys(ctx, login, password)
 	if err != nil {
 		return nil, fmt.Errorf("authService.Unlock: %w", err)
 	}
@@ -234,6 +247,9 @@ func (s *authService) Unlock(ctx context.Context, login, password string) ([]byt
 	if err := s.saveSession(login, token); err != nil {
 		return nil, fmt.Errorf("authService.Unlock: %w", err)
 	}
+	if s.onUnlock != nil {
+		s.onUnlock(login, salt, kdf)
+	}
 
 	return masterKey, nil
 }
@@ -243,26 +259,26 @@ func (s *authService) Unlock(ctx context.Context, login, password string) ([]byt
 // сервер мог бы прислать слабые параметры, чтобы удешевить перебор пароля по authKey,
 // или огромные, чтобы клиент завис. Кроме общих границ, параметры не должны быть слабее
 // запомненных на этом устройстве (kdfpin). Возвращает и сами параметры, чтобы после
-// успешного входа их запомнить.
+// успешного входа их запомнить, и соль — для офлайн-копии (UnlockHook).
 func (s *authService) userKeys(
 	ctx context.Context, login, password string,
-) (masterKey, authKey []byte, kdf domain.KDFParams, err error) {
-	salt, kdf, err := s.client.GetSalt(ctx, login)
+) (masterKey, authKey, salt []byte, kdf domain.KDFParams, err error) {
+	salt, kdf, err = s.client.GetSalt(ctx, login)
 	if err != nil {
-		return nil, nil, kdf, err
+		return nil, nil, nil, kdf, err
 	}
 	if err := kdf.Validate(); err != nil {
-		return nil, nil, kdf, fmt.Errorf("server sent unacceptable kdf params: %w", err)
+		return nil, nil, nil, kdf, fmt.Errorf("server sent unacceptable kdf params: %w", err)
 	}
 	known, ok, err := s.kdfPins.Get(s.server, login)
 	if err != nil {
-		return nil, nil, kdf, err
+		return nil, nil, nil, kdf, err
 	}
 	if ok && kdf.WeakerThan(known) {
-		return nil, nil, kdf, &domain.KDFDowngradeError{Known: known, Received: kdf}
+		return nil, nil, nil, kdf, &domain.KDFDowngradeError{Known: known, Received: kdf}
 	}
 	masterKey, authKey, err = deriveKeys(password, salt, kdf)
-	return masterKey, authKey, kdf, err
+	return masterKey, authKey, salt, kdf, err
 }
 
 // deriveKeys выводит мастер-ключ Argon2id(password, salt) и ключ аутентификации
@@ -309,7 +325,7 @@ func (s *authService) ChangePassword(
 	if err := newKDF.Validate(); err != nil {
 		return fmt.Errorf("authService.ChangePassword: %w", err)
 	}
-	_, oldAuthKey, _, err := s.userKeys(ctx, login, oldPassword)
+	_, oldAuthKey, _, _, err := s.userKeys(ctx, login, oldPassword)
 	if err != nil {
 		return fmt.Errorf("authService.ChangePassword: %w", err)
 	}
@@ -353,7 +369,7 @@ func (s *authService) ChangePassword(
 
 // DeleteAccount удаляет учётку пользователя и локальную сессию.
 func (s *authService) DeleteAccount(ctx context.Context, login, password string) error {
-	_, authKey, _, err := s.userKeys(ctx, login, password)
+	_, authKey, _, _, err := s.userKeys(ctx, login, password)
 	if err != nil {
 		return fmt.Errorf("authService.DeleteAccount: %w", err)
 	}

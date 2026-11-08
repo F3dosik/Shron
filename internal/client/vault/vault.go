@@ -7,6 +7,12 @@
 // запроса: если токен отозван (выход на всех устройствах, смена пароля), запрос
 // не проходит, хранилище блокируется и требует пароль.
 //
+// Если задан Config.CachePath, на устройстве хранится зашифрованная копия записей
+// (см. internal/client/offline и cachedClient). Когда сервер недоступен, хранилище
+// разблокируется паролем или мастер-ключом по копии и отдаёт записи из неё — только для
+// чтения. Когда сервер снова отвечает, по мастер-ключу выполняется вход и работа
+// продолжается как обычно.
+//
 // Все методы безопасны для вызова из разных горутин; операции выполняются по одной.
 package vault
 
@@ -25,9 +31,11 @@ import (
 
 	"github.com/F3dosik/Shron/internal/client/grpcclient"
 	"github.com/F3dosik/Shron/internal/client/kdfpin"
+	"github.com/F3dosik/Shron/internal/client/offline"
 	"github.com/F3dosik/Shron/internal/client/service"
 	"github.com/F3dosik/Shron/internal/client/session"
 	"github.com/F3dosik/Shron/internal/domain"
+	"github.com/F3dosik/Shron/pkg/crypto"
 	pb "github.com/F3dosik/Shron/proto/gen"
 	"github.com/golang-jwt/jwt/v5"
 	"google.golang.org/grpc"
@@ -51,6 +59,11 @@ type Config struct {
 	Insecure bool
 	// SessionPath — файл сессии (логин и токен).
 	SessionPath string
+	// CachePath — файл копии хранилища для работы без сервера; пустой — без копии.
+	CachePath string
+	// OfflineRetryAfter — сколько после неудачного обращения к серверу читать из копии,
+	// не обращаясь к нему; 0 — 30 секунд.
+	OfflineRetryAfter time.Duration
 	// AutoLockAfter — блокировка после бездействия; 0 — не блокировать автоматически.
 	AutoLockAfter time.Duration
 	// RequestTimeout — таймаут одной операции; 0 — 30 секунд.
@@ -93,7 +106,8 @@ type Vault struct {
 	conn   *grpc.ClientConn
 	tokens *grpcclient.TokenStore
 	auth   service.AuthService
-	client grpcclient.SecretsClient
+	cache  *cachedClient
+	pins   *kdfpin.Store
 
 	mu        sync.Mutex
 	login     string
@@ -101,6 +115,13 @@ type Vault struct {
 	secrets   service.SecretsService
 	idleTimer *time.Timer
 	idleGen   uint64
+	// unlockSalt и unlockKDF — соль и параметры Argon2id последней проверки пароля на
+	// сервере (service.UnlockHook), для копии на устройстве.
+	unlockSalt []byte
+	unlockKDF  domain.KDFParams
+	// needsLogin — хранилище разблокировано без сервера: когда сервер ответит, нужно
+	// войти по мастер-ключу, чтобы получить действующий токен.
+	needsLogin bool
 }
 
 // Open подключается к серверу и восстанавливает логин и токен из файла сессии,
@@ -111,6 +132,9 @@ func Open(cfg Config) (*Vault, error) {
 	}
 	if cfg.RefreshMargin <= 0 {
 		cfg.RefreshMargin = defaultRefreshMargin
+	}
+	if cfg.OfflineRetryAfter <= 0 {
+		cfg.OfflineRetryAfter = offlineRetryAfter
 	}
 
 	var login, token string
@@ -132,15 +156,22 @@ func Open(cfg Config) (*Vault, error) {
 		return nil, fmt.Errorf("vault: %w", err)
 	}
 
-	return &Vault{
+	pins := kdfpin.NextTo(cfg.SessionPath)
+	v := &Vault{
 		cfg:    cfg,
 		conn:   conn,
 		tokens: tokens,
-		auth: service.NewAuthService(grpcclient.NewAuthClient(pb.NewAuthClient(conn)), cfg.SessionPath, tokens,
-			service.WithKDFPins(kdfpin.NextTo(cfg.SessionPath), cfg.ServerAddress)),
-		client: grpcclient.NewSecretsClient(pb.NewSecretsClient(conn)),
+		cache:  newCachedClient(grpcclient.NewSecretsClient(pb.NewSecretsClient(conn)), cfg.CachePath, cfg.OfflineRetryAfter),
+		pins:   pins,
 		login:  login,
-	}, nil
+	}
+	// Хук вызывается внутри auth.Unlock, то есть под v.mu (SignIn).
+	v.auth = service.NewAuthService(grpcclient.NewAuthClient(pb.NewAuthClient(conn)), cfg.SessionPath, tokens,
+		service.WithKDFPins(pins, cfg.ServerAddress),
+		service.WithUnlockHook(func(_ string, salt []byte, kdf domain.KDFParams) {
+			v.unlockSalt, v.unlockKDF = bytes.Clone(salt), kdf
+		}))
+	return v, nil
 }
 
 // Close блокирует хранилище и закрывает соединение.
@@ -165,6 +196,14 @@ func (v *Vault) IsUnlocked() bool {
 	return v.secrets != nil
 }
 
+// Offline сообщает, что записи сейчас читаются из копии на устройстве, потому что
+// сервер недоступен, и когда копия последний раз получила записи с сервера.
+func (v *Vault) Offline() (offline bool, syncedAt time.Time) {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	return v.cache.isOffline(), v.cache.syncedAt()
+}
+
 // Register регистрирует учётку. Вход после регистрации выполняется отдельно (SignIn).
 func (v *Vault) Register(ctx context.Context, login, password string, kdf domain.KDFParams) error {
 	ctx, cancel := context.WithTimeout(ctx, v.cfg.RequestTimeout)
@@ -181,7 +220,16 @@ func (v *Vault) SignIn(ctx context.Context, login, password string) (passwordCha
 
 	v.mu.Lock()
 	v.lockLocked()
-	masterKey, err := v.auth.Unlock(ctx, login, password)
+	v.unlockSalt = nil
+	authCtx, authCancel := v.authContext(ctx, login)
+	masterKey, err := v.auth.Unlock(authCtx, login, password)
+	authCancel()
+	if isNetworkError(err) {
+		if offErr := v.unlockOfflineWithPasswordLocked(login, password); !errors.Is(offErr, errNoCache) {
+			v.mu.Unlock()
+			return false, offErr
+		}
+	}
 	if errors.Is(err, domain.ErrPasswordChangeRequired) {
 		// Unlock не сохраняет токен временного пароля; Login получает его для смены пароля.
 		_, err = v.auth.Login(ctx, login, password)
@@ -254,7 +302,16 @@ func (v *Vault) UnlockWithKey(ctx context.Context, masterKey []byte) error {
 		return ErrNotSignedIn
 	}
 	v.lockLocked()
-	if err := v.auth.RefreshToken(ctx, v.login, key); err != nil {
+	authCtx, authCancel := v.authContext(ctx, v.login)
+	err := v.auth.RefreshToken(authCtx, v.login, key)
+	authCancel()
+	if isNetworkError(err) {
+		offErr := v.unlockOfflineWithKeyLocked(key)
+		if !errors.Is(offErr, errNoCache) {
+			return offErr
+		}
+	}
+	if err != nil {
 		clear(key)
 		if errors.Is(err, domain.ErrPasswordChangeRequired) {
 			return ErrKeyRejected
@@ -262,6 +319,142 @@ func (v *Vault) UnlockWithKey(ctx context.Context, masterKey []byte) error {
 		return wrapCredentials(err, ErrKeyRejected)
 	}
 	return v.unlockLocked(v.login, key)
+}
+
+// unlockOfflineWithPasswordLocked разблокирует хранилище по копии на устройстве:
+// выводит мастер-ключ из пароля по сохранённым соли и параметрам и проверяет им подпись
+// копии. errNoCache — копии для этой учётки нет. Вызывается под v.mu.
+func (v *Vault) unlockOfflineWithPasswordLocked(login, password string) error {
+	sealed, err := v.loadCache(login)
+	if err != nil {
+		return err
+	}
+	snap := sealed.Unverified()
+	if len(snap.Salt) == 0 || snap.KDF.Validate() != nil {
+		return errNoCache
+	}
+	// Параметры в копии получены от сервера при входе и тогда же запомнены; более
+	// слабые, чем запомненные, значат подмену файла.
+	if known, ok, err := v.pins.Get(v.cfg.ServerAddress, login); err != nil || (ok && snap.KDF.WeakerThan(known)) {
+		return errNoCache
+	}
+	masterKey := crypto.DeriveKey(password, snap.Salt, snap.KDF)
+	opened, err := sealed.Open(masterKey)
+	if err != nil {
+		clear(masterKey)
+		return ErrWrongPassword
+	}
+	return v.unlockOfflineLocked(opened, masterKey)
+}
+
+// unlockOfflineWithKeyLocked разблокирует хранилище по копии мастер-ключом (биометрия).
+// Без сервера сменённый на другом устройстве пароль не обнаружить: ключ пропустит к
+// копии, которую он сам и подписал, — то есть к данным, уже бывшим на устройстве.
+// Вызывается под v.mu; ключ переходит во владение Vault.
+func (v *Vault) unlockOfflineWithKeyLocked(key []byte) error {
+	sealed, err := v.loadCache(v.login)
+	if err != nil {
+		return err
+	}
+	opened, err := sealed.Open(key)
+	if err != nil {
+		clear(key)
+		return ErrKeyRejected
+	}
+	return v.unlockOfflineLocked(opened, key)
+}
+
+// unlockOfflineLocked разблокирует хранилище с записями из копии. Вызывается под v.mu.
+func (v *Vault) unlockOfflineLocked(snap *offline.Snapshot, masterKey []byte) error {
+	if err := v.unlockLocked(snap.Login, masterKey); err != nil {
+		return err
+	}
+	v.cache.attach(snap, masterKey, true)
+	v.needsLogin = true
+	return nil
+}
+
+// errNoCache — копии для учётки нет: работать без сервера нельзя.
+var errNoCache = errors.New("vault: no offline copy")
+
+// loadCache читает копию учётки login на этом сервере; errNoCache — её нет или она чужая.
+func (v *Vault) loadCache(login string) (*offline.Sealed, error) {
+	if v.cfg.CachePath == "" || login == "" {
+		return nil, errNoCache
+	}
+	sealed, err := offline.Load(v.cfg.CachePath)
+	if err != nil {
+		return nil, errNoCache
+	}
+	snap := sealed.Unverified()
+	if snap.Server != v.cfg.ServerAddress || !strings.EqualFold(snap.Login, login) || snap.SyncedAt.IsZero() {
+		return nil, errNoCache
+	}
+	return sealed, nil
+}
+
+// authContext — таймаут входа. Если есть копия на устройстве, сервер ждём недолго:
+// без него хранилище откроется по копии.
+func (v *Vault) authContext(ctx context.Context, login string) (context.Context, context.CancelFunc) {
+	timeout := v.cfg.RequestTimeout
+	if _, err := v.loadCache(login); err == nil {
+		timeout = min(timeout, offlineReadTimeout)
+	}
+	return context.WithTimeout(ctx, timeout)
+}
+
+// attachCacheLocked подключает копию после разблокировки через сервер. Записи прежней
+// копии сохраняются, если она подписана тем же мастер-ключом (пароль не менялся), —
+// тогда они доступны без сети ещё до первого списка. Вызывается под v.mu.
+func (v *Vault) attachCacheLocked(login string, masterKey []byte) {
+	if v.cfg.CachePath == "" {
+		return
+	}
+	snap := &offline.Snapshot{Server: v.cfg.ServerAddress, Login: login}
+	if sealed, err := v.loadCache(login); err == nil {
+		if prev, err := sealed.Open(masterKey); err == nil {
+			snap = prev
+		} else {
+			// Копия подписана прежним ключом (пароль сменили): она больше не откроется.
+			v.removeCache()
+		}
+	}
+	if v.unlockSalt != nil {
+		// Пароль только что проверен сервером с этими солью и параметрами.
+		snap.Salt, snap.KDF = v.unlockSalt, v.unlockKDF
+	}
+	v.unlockSalt = nil
+	v.cache.attach(snap, masterKey, false)
+}
+
+// loginIfNeededLocked после разблокировки без сервера входит по мастер-ключу, как
+// только сервер доступен. Пока сервер недоступен, попытка не чаще offlineRetryAfter.
+// Если сервер ключ не принял (пароль сменили), хранилище блокируется. Вызывается под v.mu.
+func (v *Vault) loginIfNeededLocked(ctx context.Context) (locked bool) {
+	if !v.needsLogin || v.cache.skipRemote(ctx) {
+		return false
+	}
+	rctx, cancel := context.WithTimeout(ctx, offlineReadTimeout)
+	err := v.auth.RefreshToken(rctx, v.login, v.masterKey)
+	cancel()
+	switch {
+	case err == nil:
+		v.needsLogin = false
+		v.cache.online()
+	case isNetworkError(err):
+		v.cache.markOffline()
+	case errors.Is(err, domain.ErrInvalidCredentials), errors.Is(err, domain.ErrPasswordChangeRequired):
+		return v.lockLocked()
+	}
+	return false
+}
+
+// RetryServer просит при следующем чтении обратиться к серверу, даже если он недавно
+// не ответил (например, пользователь обновляет список вручную).
+func (v *Vault) RetryServer() {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	v.cache.retryAt = time.Time{}
 }
 
 // MasterKey возвращает копию мастер-ключа разблокированного хранилища, чтобы
@@ -400,7 +593,8 @@ func (v *Vault) DeleteSecret(ctx context.Context, name string, secretType domain
 // и оставляет хранилище разблокированным новым паролем. Остальные устройства
 // после смены должны войти заново.
 func (v *Vault) ChangePassword(ctx context.Context, oldPassword, newPassword string, kdf domain.KDFParams) error {
-	err := v.withSecrets(ctx, bulkTimeout, func(ctx context.Context, svc service.SecretsService) error {
+	// Перешифровать нужно ровно то, что на сервере, а не копию на устройстве.
+	err := v.withSecrets(withoutCache(ctx), bulkTimeout, func(ctx context.Context, svc service.SecretsService) error {
 		reencrypt := func(newMasterKey []byte) ([]domain.ReencryptedSecret, error) {
 			return svc.Reencrypt(ctx, newMasterKey)
 		}
@@ -431,6 +625,7 @@ func (v *Vault) Logout(ctx context.Context, allSessions bool) error {
 	}
 	locked := v.lockLocked()
 	v.login = ""
+	v.removeCache()
 	v.mu.Unlock()
 	if locked {
 		v.notifyLock(LockSignedOut)
@@ -455,11 +650,19 @@ func (v *Vault) DeleteAccount(ctx context.Context, password string) error {
 	}
 	locked := v.lockLocked()
 	v.login = ""
+	v.removeCache()
 	v.mu.Unlock()
 	if locked {
 		v.notifyLock(LockSignedOut)
 	}
 	return nil
+}
+
+// removeCache удаляет копию на устройстве (выход, удаление учётки).
+func (v *Vault) removeCache() {
+	if v.cfg.CachePath != "" {
+		_ = offline.Remove(v.cfg.CachePath)
+	}
 }
 
 // withSecrets выполняет операцию над разблокированным хранилищем.
@@ -478,6 +681,11 @@ func (v *Vault) withSecrets(
 		return ErrLocked
 	}
 	v.armIdleTimerLocked()
+	if v.loginIfNeededLocked(ctx) {
+		v.mu.Unlock()
+		v.notifyLock(LockSessionExpired)
+		return ErrSessionExpired
+	}
 
 	err := op(ctx, v.secrets)
 	if errors.Is(err, domain.ErrInvalidCredentials) {
@@ -488,7 +696,7 @@ func (v *Vault) withSecrets(
 		}
 		return ErrSessionExpired
 	}
-	if err == nil {
+	if err == nil && !v.needsLogin && !v.cache.isOffline() {
 		v.refreshTokenLocked(ctx)
 	}
 	v.mu.Unlock()
@@ -497,7 +705,7 @@ func (v *Vault) withSecrets(
 
 // unlockLocked переводит хранилище в разблокированное состояние. Вызывается под v.mu.
 func (v *Vault) unlockLocked(login string, masterKey []byte) error {
-	svc, err := service.NewSecretsService(v.client, masterKey)
+	svc, err := service.NewSecretsService(v.cache, masterKey)
 	if err != nil {
 		clear(masterKey)
 		return fmt.Errorf("vault: %w", err)
@@ -505,6 +713,7 @@ func (v *Vault) unlockLocked(login string, masterKey []byte) error {
 	v.login = login
 	v.masterKey = masterKey
 	v.secrets = svc
+	v.attachCacheLocked(login, masterKey)
 	v.armIdleTimerLocked()
 	return nil
 }
@@ -517,6 +726,8 @@ func (v *Vault) lockLocked() bool {
 		v.idleTimer.Stop()
 		v.idleTimer = nil
 	}
+	v.needsLogin = false
+	v.cache.detach()
 	if v.secrets == nil {
 		return false
 	}

@@ -15,6 +15,7 @@ import (
 
 	"github.com/F3dosik/Shron/internal/client/config"
 	"github.com/F3dosik/Shron/internal/client/grpcclient"
+	"github.com/F3dosik/Shron/internal/client/offline"
 	"github.com/F3dosik/Shron/internal/client/vault"
 	"github.com/F3dosik/Shron/internal/domain"
 	pb "github.com/F3dosik/Shron/proto/gen"
@@ -50,6 +51,11 @@ type State struct {
 	Login string `json:"login"`
 	// Unlocked — хранилище разблокировано.
 	Unlocked bool `json:"unlocked"`
+	// Offline — сервер недоступен, записи показаны из копии на устройстве (только чтение).
+	Offline bool `json:"offline"`
+	// SyncedAt — когда копия последний раз получила записи с сервера, миллисекунды Unix;
+	// 0 — копии нет.
+	SyncedAt int64 `json:"syncedAt"`
 	// AdminMode — приложение подключено к административному порту сервера: доступна
 	// только административная панель, хранилища там нет.
 	AdminMode bool `json:"adminMode"`
@@ -138,6 +144,11 @@ func (a *App) GetState() State {
 	if a.vault != nil {
 		state.Login = a.vault.CurrentLogin()
 		state.Unlocked = a.vault.IsUnlocked()
+		offline, syncedAt := a.vault.Offline()
+		state.Offline = offline
+		if !syncedAt.IsZero() {
+			state.SyncedAt = syncedAt.UnixMilli()
+		}
 	}
 	state.AdminMode = a.admin != nil && a.admin.active
 	return state
@@ -222,8 +233,9 @@ func (a *App) SaveSettings(address, caPEM string, useSavedCA bool, autoLockMinut
 		return toUIError(err)
 	}
 	if settings.ServerAddress != a.settings.ServerAddress {
-		// Сессия принадлежит другому серверу.
+		// Сессия и копия хранилища принадлежат другому серверу.
 		_ = os.Remove(filepath.Join(a.opts.Dir, sessionFile))
+		_ = offline.Remove(filepath.Join(a.opts.Dir, offline.FileName))
 	}
 	a.settings = settings
 	return a.openVaultLocked()
@@ -396,6 +408,7 @@ func (a *App) openVaultLocked() error {
 		CACertPEM:     caPEM,
 		Insecure:      a.opts.Insecure,
 		SessionPath:   filepath.Join(a.opts.Dir, sessionFile),
+		CachePath:     filepath.Join(a.opts.Dir, offline.FileName),
 		AutoLockAfter: time.Duration(a.settings.AutoLockMinutes) * time.Minute,
 		OnLock: func(reason vault.LockReason) {
 			a.opts.UI.Emit(EventLocked, string(reason))

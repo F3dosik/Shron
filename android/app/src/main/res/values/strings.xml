@@ -163,6 +163,8 @@
     <string name="filter_all_types">Все типы</string>
     <string name="filter_type">Тип: %1$s</string>
     <string name="secrets_empty">Записей пока нет</string>
+    <string name="offline_banner">Нет связи с сервером. Показана копия на устройстве от %1$s — изменения недоступны. Потяните список вниз, чтобы проверить связь.</string>
+    <string name="offline_banner_no_date">Нет связи с сервером. Показана копия на устройстве — изменения недоступны.</string>
 
     <!-- Типы записей: полные названия — в списке, короткие — в переключателе формы -->
     <string name="type_credentials">Логин</string>

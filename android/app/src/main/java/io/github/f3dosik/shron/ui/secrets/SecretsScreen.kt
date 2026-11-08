@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Lock
@@ -53,6 +54,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.f3dosik.shron.R
 import io.github.f3dosik.shron.mobile.Mobile
 import java.text.DateFormat
@@ -73,6 +75,7 @@ fun SecretsScreen(
         onDispose(vm::forget)
     }
     var menu by remember { mutableStateOf(false) }
+    val coreState by vm.coreState.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {
@@ -101,60 +104,92 @@ fun SecretsScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = onAdd) {
-                Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.action_add_secret))
+            // Без сервера записи не изменить: кнопку добавления не показываем.
+            if (!coreState.offline) {
+                FloatingActionButton(onClick = onAdd) {
+                    Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.action_add_secret))
+                }
             }
         },
     ) { padding ->
-        PullToRefreshBox(
-            isRefreshing = vm.busy,
-            onRefresh = vm::load,
-            modifier = Modifier
+        Column(
+            Modifier
                 .fillMaxSize()
                 .padding(padding),
         ) {
-            val all = vm.items
-            val error = vm.error
-            when {
-                error != null && all.isNullOrEmpty() -> Placeholder(error.message, isError = true)
-                all == null -> Unit
-                all.isEmpty() -> Placeholder(stringResource(R.string.secrets_empty))
-                else -> LazyColumn(Modifier.fillMaxSize()) {
-                    item { SearchBar(vm) }
-                    if (error != null) {
-                        item { Text(error.message, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(16.dp)) }
-                    }
-                    val items = filterSecrets(all, vm.query, vm.typeFilter)
-                    if (items.isEmpty()) {
-                        item {
-                            Text(
-                                stringResource(R.string.search_nothing_found),
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(32.dp),
-                            )
+            if (coreState.offline) OfflineBanner(coreState.syncedAt)
+            PullToRefreshBox(
+                isRefreshing = vm.busy,
+                onRefresh = vm::refresh,
+                modifier = Modifier.fillMaxSize(),
+            ) {
+                val all = vm.items
+                val error = vm.error
+                when {
+                    error != null && all.isNullOrEmpty() -> Placeholder(error.message, isError = true)
+                    all == null -> Unit
+                    all.isEmpty() -> Placeholder(stringResource(R.string.secrets_empty))
+                    else -> LazyColumn(Modifier.fillMaxSize()) {
+                        item { SearchBar(vm) }
+                        if (error != null) {
+                            item { Text(error.message, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(16.dp)) }
                         }
-                    }
-                    // Пока групп нет, список плоский, без заголовков. При поиске группы
-                    // раскрыты, чтобы найденное не пряталось в свёрнутых.
-                    val headers = all.any { it.group.isNotEmpty() }
-                    val searching = vm.query.isNotBlank()
-                    groupSecrets(items).forEach { group ->
-                        val expanded = !headers || searching || group.name !in vm.collapsed
-                        if (headers) {
-                            stickyHeader(key = "group/" + group.name) {
-                                GroupHeader(group, expanded, enabled = !searching, onClick = { vm.toggleGroup(group.name) })
+                        val items = filterSecrets(all, vm.query, vm.typeFilter)
+                        if (items.isEmpty()) {
+                            item {
+                                Text(
+                                    stringResource(R.string.search_nothing_found),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(32.dp),
+                                )
                             }
                         }
-                        if (!expanded) return@forEach
-                        items(group.items, key = { it.type + "/" + it.name }) { item ->
-                            SecretRow(item, onClick = { onOpen(SecretRef(item.name, item.type)) })
-                            HorizontalDivider()
+                        // Пока групп нет, список плоский, без заголовков. При поиске группы
+                        // раскрыты, чтобы найденное не пряталось в свёрнутых.
+                        val headers = all.any { it.group.isNotEmpty() }
+                        val searching = vm.query.isNotBlank()
+                        groupSecrets(items).forEach { group ->
+                            val expanded = !headers || searching || group.name !in vm.collapsed
+                            if (headers) {
+                                stickyHeader(key = "group/" + group.name) {
+                                    GroupHeader(group, expanded, enabled = !searching, onClick = { vm.toggleGroup(group.name) })
+                                }
+                            }
+                            if (!expanded) return@forEach
+                            items(group.items, key = { it.type + "/" + it.name }) { item ->
+                                SecretRow(item, onClick = { onOpen(SecretRef(item.name, item.type)) })
+                                HorizontalDivider()
+                            }
                         }
+                        // Место под круглую кнопку «+», чтобы она не закрывала последнюю запись.
+                        item { Spacer(Modifier.height(88.dp)) }
                     }
-                    // Место под круглую кнопку «+», чтобы она не закрывала последнюю запись.
-                    item { Spacer(Modifier.height(88.dp)) }
                 }
             }
+        }
+    }
+}
+
+/**
+ * Плашка «нет связи»: список и автозаполнение работают по копии на устройстве от
+ * [syncedAt], изменения — только при связи с сервером. Потянуть список — проверить связь.
+ */
+@Composable
+private fun OfflineBanner(syncedAt: Long) {
+    val text = if (syncedAt > 0) {
+        val date = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(syncedAt))
+        stringResource(R.string.offline_banner, date)
+    } else {
+        stringResource(R.string.offline_banner_no_date)
+    }
+    Surface(color = MaterialTheme.colorScheme.secondaryContainer, modifier = Modifier.fillMaxWidth()) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+        ) {
+            Icon(Icons.Filled.Info, contentDescription = null, tint = MaterialTheme.colorScheme.onSecondaryContainer)
+            Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSecondaryContainer)
         }
     }
 }

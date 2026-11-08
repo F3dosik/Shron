@@ -25,6 +25,9 @@ const (
 	// InfoAuth используется для деривации ключа аутентификации, который отправляется на сервер.
 	// Ключ независим от ключей шифрования и blind index: знание authKey не позволяет их восстановить.
 	InfoAuth = "auth"
+	// InfoOfflineCache используется для деривации ключа HMAC-SHA256, которым подписана
+	// офлайн-копия хранилища на устройстве (internal/client/offline).
+	InfoOfflineCache = "offline-cache"
 )
 
 // DeriveKey возвращает ключ из пароля и соли используя Argon2id с параметрами params.
