@@ -39,6 +39,8 @@ type cachedClient struct {
 	retryAfter time.Duration
 	// queue — изменения без сервера ставятся в очередь; иначе возвращается ошибка сети.
 	queue bool
+	// standalone — хранилище без сервера: все записи — записи устройства, remote не нужен.
+	standalone bool
 
 	// snap — проверенная копия разблокированной учётки; nil — копии нет (хранилище
 	// заблокировано или копия выключена).
@@ -146,6 +148,12 @@ func (c *cachedClient) readContext(ctx context.Context) (context.Context, contex
 }
 
 func (c *cachedClient) ListSecrets(ctx context.Context) ([]*domain.Secret, error) {
+	if c.standalone {
+		if c.snap == nil {
+			return nil, ErrLocked
+		}
+		return c.view(), nil
+	}
 	if noCache(ctx) {
 		return c.remote.ListSecrets(ctx)
 	}
@@ -177,6 +185,9 @@ func (c *cachedClient) ListSecrets(ctx context.Context) ([]*domain.Secret, error
 }
 
 func (c *cachedClient) GetSecret(ctx context.Context, blindIndex string) (*domain.Secret, error) {
+	if c.standalone {
+		return c.viewSecret(blindIndex)
+	}
 	if noCache(ctx) {
 		return c.remote.GetSecret(ctx, blindIndex)
 	}
@@ -226,8 +237,14 @@ func (c *cachedClient) DeleteSecret(ctx context.Context, blindIndex string) erro
 func (c *cachedClient) write(
 	ctx context.Context, kind offline.OpKind, blindIndex string, data []byte, remote func(context.Context) error,
 ) error {
-	if isLocal(ctx) && kind == offline.OpCreate {
+	if (isLocal(ctx) || c.standalone) && kind == offline.OpCreate {
 		return c.createLocal(blindIndex, data)
+	}
+	if c.standalone {
+		if c.findLocal(blindIndex) < 0 {
+			return domain.ErrNotFound
+		}
+		return c.writeLocal(kind, blindIndex, data)
 	}
 	if c.snap == nil || noCache(ctx) {
 		return remote(ctx)
@@ -303,6 +320,9 @@ func (c *cachedClient) writeLocal(kind offline.OpKind, blindIndex string, data [
 // moveToServer отправляет запись только на этом устройстве на сервер (без сервера —
 // в очередь, если она включена) и убирает её из записей устройства.
 func (c *cachedClient) moveToServer(ctx context.Context, blindIndex string) error {
+	if c.standalone {
+		return ErrStandalone
+	}
 	i := c.findLocal(blindIndex)
 	if i < 0 {
 		return domain.ErrNotFound
@@ -327,6 +347,9 @@ func (c *cachedClient) moveToServer(ctx context.Context, blindIndex string) erro
 func (c *cachedClient) moveToDevice(ctx context.Context, blindIndex string) error {
 	if c.snap == nil {
 		return ErrLocalUnavailable
+	}
+	if c.standalone {
+		return ErrStandalone
 	}
 	if c.findLocal(blindIndex) >= 0 {
 		return nil

@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import io.github.f3dosik.shron.ui.common.accountName
 import io.github.f3dosik.shron.MainActivity
 import io.github.f3dosik.shron.R
 import io.github.f3dosik.shron.ShronApplication
@@ -151,11 +152,11 @@ internal fun UnlockSheet(
                 when {
                     state.unlocked -> LinearProgressIndicator(Modifier.fillMaxWidth())
                     // Вход и временный пароль — в приложении: там полные экраны с подтверждением.
-                    state.login.isEmpty() || auth.temporaryPassword != null -> {
+                    !state.signedIn || auth.temporaryPassword != null -> {
                         Text(stringResource(R.string.autofill_sign_in_first), style = MaterialTheme.typography.bodyMedium)
                         PrimaryButton(stringResource(R.string.autofill_open_app), busy = false, onClick = onOpenApp)
                     }
-                    else -> UnlockForm(auth, state.login)
+                    else -> UnlockForm(auth, accountName(state))
                 }
                 TextButton(onClick = onCancel, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.cancel)) }
             }

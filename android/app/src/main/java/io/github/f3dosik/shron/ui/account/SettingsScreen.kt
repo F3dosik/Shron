@@ -67,6 +67,7 @@ fun SettingsScreen(
     serverAddress: String,
     onBack: () -> Unit,
     onConnection: () -> Unit,
+    standalone: Boolean = false,
 ) {
     BackHandler(onBack = onBack)
     val snackbar = remember { SnackbarHostState() }
@@ -104,8 +105,16 @@ fun SettingsScreen(
         ) {
             SectionTitle(stringResource(R.string.account_section))
             ListItem(
-                headlineContent = { Text(login) },
-                supportingContent = { Text(stringResource(R.string.server_label, serverAddress)) },
+                headlineContent = { Text(if (standalone) stringResource(R.string.standalone_settings_headline) else login) },
+                supportingContent = {
+                    Text(
+                        if (standalone) {
+                            stringResource(R.string.standalone_settings_hint)
+                        } else {
+                            stringResource(R.string.server_label, serverAddress)
+                        },
+                    )
+                },
                 leadingContent = { Icon(Icons.Filled.AccountCircle, contentDescription = null) },
             )
 
@@ -114,7 +123,9 @@ fun SettingsScreen(
             BiometricSection(vm, enabled)
             ListItem(
                 headlineContent = { Text(stringResource(R.string.connection_open)) },
-                supportingContent = { Text(stringResource(R.string.connection_open_hint)) },
+                supportingContent = {
+                    Text(stringResource(if (standalone) R.string.connection_open_hint_standalone else R.string.connection_open_hint))
+                },
                 trailingContent = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) },
                 modifier = Modifier.clickable(enabled = enabled, onClick = onConnection),
             )
@@ -127,21 +138,23 @@ fun SettingsScreen(
             HorizontalDivider()
             ChangePasswordSection(vm, enabled)
 
-            HorizontalDivider()
-            Text(stringResource(R.string.sessions_section), style = MaterialTheme.typography.titleMedium)
-            Text(
-                stringResource(R.string.logout_everywhere_hint),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            OutlinedButton(onClick = { confirmLogoutAll = true }, enabled = enabled, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(R.string.logout_everywhere))
+            if (!standalone) {
+                HorizontalDivider()
+                Text(stringResource(R.string.sessions_section), style = MaterialTheme.typography.titleMedium)
+                Text(
+                    stringResource(R.string.logout_everywhere_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                OutlinedButton(onClick = { confirmLogoutAll = true }, enabled = enabled, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.logout_everywhere))
+                }
             }
 
             HorizontalDivider()
-            Text(stringResource(R.string.delete_account), style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(if (standalone) R.string.delete_standalone else R.string.delete_account), style = MaterialTheme.typography.titleMedium)
             Text(
-                stringResource(R.string.delete_account_text, login),
+                if (standalone) stringResource(R.string.delete_standalone_text) else stringResource(R.string.delete_account_text, login),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -153,7 +166,7 @@ fun SettingsScreen(
                 enabled = enabled,
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
                 modifier = Modifier.fillMaxWidth(),
-            ) { Text(stringResource(R.string.delete_account)) }
+            ) { Text(stringResource(if (standalone) R.string.delete_standalone else R.string.delete_account)) }
         }
     }
 
@@ -181,7 +194,7 @@ fun SettingsScreen(
     }
 
     if (confirmDelete) {
-        DeleteAccountDialog(vm, login, onDismiss = {
+        DeleteAccountDialog(vm, if (standalone) null else login, onDismiss = {
             confirmDelete = false
             vm.resetDeleteForm()
         })
@@ -302,21 +315,26 @@ private fun ChangePasswordSection(vm: AccountViewModel, enabled: Boolean) {
     )
 }
 
-/** Удаление учётки: как на десктопе, нужно ввести логин и мастер-пароль. */
+/**
+ * Удаление учётки: как на десктопе, нужно ввести логин и мастер-пароль. [login] == null —
+ * хранилище без сервера: логина нет, хватает пароля.
+ */
 @Composable
-private fun DeleteAccountDialog(vm: AccountViewModel, login: String, onDismiss: () -> Unit) {
+private fun DeleteAccountDialog(vm: AccountViewModel, login: String?, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = { if (!vm.busy) onDismiss() },
-        title = { Text(stringResource(R.string.delete_account)) },
+        title = { Text(stringResource(if (login == null) R.string.delete_standalone else R.string.delete_account)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(stringResource(R.string.delete_account_text, login))
-                TextInput(
-                    value = vm.deleteLogin,
-                    onValueChange = { vm.deleteLogin = it },
-                    label = stringResource(R.string.delete_account_type_login),
-                    enabled = !vm.busy,
-                )
+                Text(if (login == null) stringResource(R.string.delete_standalone_text) else stringResource(R.string.delete_account_text, login))
+                if (login != null) {
+                    TextInput(
+                        value = vm.deleteLogin,
+                        onValueChange = { vm.deleteLogin = it },
+                        label = stringResource(R.string.delete_account_type_login),
+                        enabled = !vm.busy,
+                    )
+                }
                 PasswordInput(
                     value = vm.deletePassword,
                     onValueChange = { vm.deletePassword = it },
@@ -329,7 +347,7 @@ private fun DeleteAccountDialog(vm: AccountViewModel, login: String, onDismiss: 
         confirmButton = {
             TextButton(
                 onClick = { vm.deleteAccount(login) },
-                enabled = !vm.busy && vm.deleteLogin.trim() == login && vm.deletePassword.isNotEmpty(),
+                enabled = !vm.busy && (login == null || vm.deleteLogin.trim() == login) && vm.deletePassword.isNotEmpty(),
             ) { Text(stringResource(R.string.delete_account_confirm), color = MaterialTheme.colorScheme.error) }
         },
         dismissButton = {

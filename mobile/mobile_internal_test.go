@@ -237,3 +237,43 @@ func TestGenerate(t *testing.T) {
 	_, err = GeneratePassphrase(2)
 	assert.Equal(t, CodeValidation, decodeError(t, err).Code)
 }
+
+func TestApp_Standalone(t *testing.T) {
+	dir := t.TempDir()
+	app, err := NewApp(dir, true, nil)
+	require.NoError(t, err)
+	t.Cleanup(app.Close)
+	assert.False(t, app.GetState().Configured)
+
+	require.NoError(t, app.UseStandalone(5))
+	state := app.GetState()
+	assert.True(t, state.Configured)
+	assert.True(t, state.Standalone)
+	assert.False(t, state.HasStandaloneVault)
+
+	require.Error(t, app.CreateStandalone("short"))
+	require.NoError(t, app.CreateStandalone("password-1"))
+	state = app.GetState()
+	assert.True(t, state.HasStandaloneVault)
+	assert.True(t, state.Unlocked)
+	assert.Empty(t, state.Login)
+
+	require.NoError(t, app.SaveSecret(&SecretInput{Name: "note", Type: TypeText, Text: "hello"}, false))
+	list, err := app.ListSecrets()
+	require.NoError(t, err)
+	require.Equal(t, 1, list.Len())
+
+	// Настройки переживают перезапуск.
+	app.Close()
+	app, err = NewApp(dir, true, nil)
+	require.NoError(t, err)
+	assert.True(t, app.GetState().Standalone)
+	require.NoError(t, app.Unlock("password-1"))
+	s, err := app.GetSecret("note", TypeText)
+	require.NoError(t, err)
+	assert.Equal(t, "hello", s.Text)
+
+	err = app.Logout(false)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), CodeNotSupported)
+}

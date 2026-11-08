@@ -45,7 +45,7 @@ class AccountViewModel(app: ShronApplication) : CoreViewModel(app) {
 
     private fun refreshBiometric() {
         val state = core.state.value
-        biometricEnabled = app.biometric.isEnabled(state.serverAddress, state.login)
+        biometricEnabled = app.biometric.isEnabled(state.serverAddress, state.biometricAccount)
     }
 
     // Ошибки биометрии — в Snackbar: поле ошибки на этом экране относится к смене пароля.
@@ -63,7 +63,7 @@ class AccountViewModel(app: ShronApplication) : CoreViewModel(app) {
         val state = core.state.value
         val key = core.call { it.masterKey() }
         notice = try {
-            app.biometric.save(cipher, key, state.serverAddress, state.login)
+            app.biometric.save(cipher, key, state.serverAddress, state.biometricAccount)
             string(R.string.biometric_enabled)
         } catch (_: GeneralSecurityException) {
             app.biometric.clear()
@@ -134,8 +134,9 @@ class AccountViewModel(app: ShronApplication) : CoreViewModel(app) {
     }
 
     /** Удаляет учётку навсегда; [login] введён повторно для подтверждения. */
-    fun deleteAccount(login: String) = run {
-        if (deleteLogin.trim() != login) throw validation(R.string.delete_account_login_mismatch)
+    fun deleteAccount(login: String?) = run {
+        // У хранилища без сервера логина нет ([login] == null): хватает пароля.
+        if (login != null && deleteLogin.trim() != login) throw validation(R.string.delete_account_login_mismatch)
         core.call { it.deleteAccount(deletePassword) }
         app.biometric.clear()
     }

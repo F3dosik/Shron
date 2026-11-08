@@ -53,41 +53,20 @@ fun ServerScreen(vm: ServerViewModel, onSaved: () -> Unit, onClose: (() -> Unit)
     val pauseLock = rememberExternalActivity()
     if (onClose != null) BackHandler(onBack = onClose)
 
+    val coreState by vm.coreState.collectAsStateWithLifecycle()
     FormScreen(
         title = stringResource(R.string.server_title),
-        subtitle = stringResource(R.string.server_subtitle),
+        subtitle = stringResource(if (vm.standalone) R.string.standalone_mode_subtitle else R.string.server_subtitle),
     ) {
-        SectionTitle(stringResource(R.string.server_section))
-        TextInput(
-            value = vm.address,
-            onValueChange = { vm.address = it },
-            label = stringResource(R.string.server_address),
-            supportingText = stringResource(R.string.server_address_hint),
-            keyboardType = KeyboardType.Uri,
-            enabled = !vm.busy,
-        )
-
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(stringResource(R.string.server_ca), style = MaterialTheme.typography.titleSmall)
+        if (vm.canChooseMode) ModeChoice(vm.standalone, onChange = { vm.standalone = it }, enabled = !vm.busy)
+        if (vm.standalone) {
             Text(
-                when (val ca = vm.ca) {
-                    CaSource.System -> stringResource(R.string.server_ca_system)
-                    CaSource.Saved -> stringResource(R.string.server_ca_saved)
-                    is CaSource.File -> stringResource(R.string.server_ca_file, ca.name)
-                },
+                stringResource(R.string.standalone_mode_hint),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = { pauseLock(); pickCA.launch(arrayOf("*/*")) }, enabled = !vm.busy) {
-                    Text(stringResource(R.string.server_ca_pick))
-                }
-                if (vm.ca != CaSource.System) {
-                    TextButton(onClick = vm::useSystemCA, enabled = !vm.busy) {
-                        Text(stringResource(R.string.server_ca_use_system))
-                    }
-                }
-            }
+        } else {
+            ServerFields(vm, onPickCA = { pauseLock(); pickCA.launch(arrayOf("*/*")) })
         }
 
         SectionTitle(stringResource(R.string.lock_section))
@@ -102,11 +81,17 @@ fun ServerScreen(vm: ServerViewModel, onSaved: () -> Unit, onClose: (() -> Unit)
 
         BackgroundLockChoice(vm.backgroundLockSeconds, { vm.backgroundLockSeconds = it }, enabled = !vm.busy)
 
-        val localRecords = vm.coreState.collectAsStateWithLifecycle().value.localRecords
-        if (localRecords > 0) {
+        // Без сервера все записи на телефоне, и при подключении сервера они не удаляются.
+        if (!coreState.standalone && coreState.localRecords > 0) {
             Text(
-                stringResource(R.string.server_local_warning, localRecords),
+                stringResource(R.string.server_local_warning, coreState.localRecords),
                 color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        }
+        if (coreState.standalone && !vm.standalone && coreState.hasStandaloneVault) {
+            Text(
+                stringResource(R.string.standalone_connect_hint),
                 style = MaterialTheme.typography.bodyMedium,
             )
         }
@@ -114,11 +99,67 @@ fun ServerScreen(vm: ServerViewModel, onSaved: () -> Unit, onClose: (() -> Unit)
         InfoMessage(vm.checkResult)
 
         PrimaryButton(stringResource(R.string.save), busy = vm.busy) { vm.save(onSaved) }
-        OutlinedButton(onClick = vm::check, enabled = !vm.busy, modifier = Modifier.fillMaxWidth()) {
-            Text(stringResource(R.string.server_check))
+        if (!vm.standalone) {
+            OutlinedButton(onClick = vm::check, enabled = !vm.busy, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.server_check))
+            }
         }
         if (onClose != null) {
             TextButton(onClick = onClose, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.cancel)) }
+        }
+    }
+}
+
+/** Выбор: хранить записи на сервере или только на телефоне. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ModeChoice(standalone: Boolean, onChange: (Boolean) -> Unit, enabled: Boolean) {
+    val options = listOf(false to R.string.mode_server, true to R.string.mode_standalone)
+    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+        options.forEachIndexed { index, (value, label) ->
+            SegmentedButton(
+                selected = standalone == value,
+                onClick = { onChange(value) },
+                shape = SegmentedButtonDefaults.itemShape(index, options.size),
+                enabled = enabled,
+            ) { Text(stringResource(label), maxLines = 1) }
+        }
+    }
+}
+
+/** Адрес сервера и корневой сертификат. */
+@Composable
+private fun ServerFields(vm: ServerViewModel, onPickCA: () -> Unit) {
+    SectionTitle(stringResource(R.string.server_section))
+    TextInput(
+        value = vm.address,
+        onValueChange = { vm.address = it },
+        label = stringResource(R.string.server_address),
+        supportingText = stringResource(R.string.server_address_hint),
+        keyboardType = KeyboardType.Uri,
+        enabled = !vm.busy,
+    )
+
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(stringResource(R.string.server_ca), style = MaterialTheme.typography.titleSmall)
+        Text(
+            when (val ca = vm.ca) {
+                CaSource.System -> stringResource(R.string.server_ca_system)
+                CaSource.Saved -> stringResource(R.string.server_ca_saved)
+                is CaSource.File -> stringResource(R.string.server_ca_file, ca.name)
+            },
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(onClick = onPickCA, enabled = !vm.busy) {
+                Text(stringResource(R.string.server_ca_pick))
+            }
+            if (vm.ca != CaSource.System) {
+                TextButton(onClick = vm::useSystemCA, enabled = !vm.busy) {
+                    Text(stringResource(R.string.server_ca_use_system))
+                }
+            }
         }
     }
 }

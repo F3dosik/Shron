@@ -84,8 +84,61 @@ fun SignInScreen(vm: AuthViewModel, serverAddress: String, onServerSettings: () 
     }
 }
 
+/** Создание хранилища без сервера: мастер-пароль с подтверждением. */
 @Composable
-fun UnlockScreen(vm: AuthViewModel, login: String, lockReason: String?, onServerSettings: () -> Unit) {
+fun CreateStandaloneScreen(vm: AuthViewModel, onServerSettings: () -> Unit) {
+    FormScreen(
+        title = stringResource(R.string.standalone_create_title),
+        subtitle = stringResource(R.string.standalone_create_subtitle),
+    ) {
+        PasswordInput(
+            value = vm.password,
+            onValueChange = vm::updatePassword,
+            label = stringResource(R.string.master_password),
+            enabled = !vm.busy,
+            revealed = vm.generated != null,
+        )
+        PasswordInput(
+            value = vm.confirm,
+            onValueChange = vm::updateConfirm,
+            label = stringResource(R.string.master_password_repeat),
+            enabled = !vm.busy,
+            revealed = vm.generated != null,
+            onDone = vm::createStandalone,
+        )
+        OutlinedButton(onClick = vm::generateMasterPassword, enabled = !vm.busy, modifier = Modifier.fillMaxWidth()) {
+            Text(stringResource(R.string.generate_master_password))
+        }
+        StrengthMessage(vm.generated)
+        if (vm.generated != null) {
+            GeneratorPanel(vm.generator, vm::updateGenerator, onCommit = vm::generateMasterPassword, enabled = !vm.busy)
+        }
+        Text(
+            stringResource(
+                if (vm.generated != null) R.string.generated_master_password_hint else R.string.standalone_create_warning,
+            ),
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        ErrorMessage(vm.error)
+        PrimaryButton(stringResource(R.string.standalone_create), busy = vm.busy, onClick = vm::createStandalone)
+        TextButton(onClick = onServerSettings, enabled = !vm.busy, modifier = Modifier.fillMaxWidth()) {
+            Text(stringResource(R.string.server_settings))
+        }
+    }
+}
+
+/**
+ * Разблокировка. [account] — название учётки для подписи; [standalone] — хранилище без
+ * сервера: выходить не из чего.
+ */
+@Composable
+fun UnlockScreen(
+    vm: AuthViewModel,
+    account: String,
+    lockReason: String?,
+    onServerSettings: () -> Unit,
+    standalone: Boolean = false,
+) {
     val reason = when (lockReason) {
         Mobile.LockIdle -> stringResource(R.string.locked_idle)
         Mobile.LockSessionExpired -> stringResource(R.string.locked_session_expired)
@@ -94,7 +147,7 @@ fun UnlockScreen(vm: AuthViewModel, login: String, lockReason: String?, onServer
     }
     FormScreen(
         title = stringResource(R.string.unlock_title),
-        subtitle = listOfNotNull(reason, stringResource(R.string.account_label, login)).joinToString(" "),
+        subtitle = listOfNotNull(reason, stringResource(R.string.account_label, account)).joinToString(" "),
     ) {
         PasswordInput(
             value = vm.password,
@@ -108,8 +161,10 @@ fun UnlockScreen(vm: AuthViewModel, login: String, lockReason: String?, onServer
         // После ручной блокировки запрос сразу не показывается: пользователь только что
         // сам закрыл хранилище.
         BiometricUnlockButton(vm, autoPrompt = lockReason != Mobile.LockManual)
-        TextButton(onClick = vm::logout, enabled = !vm.busy, modifier = Modifier.fillMaxWidth()) {
-            Text(stringResource(R.string.logout))
+        if (!standalone) {
+            TextButton(onClick = vm::logout, enabled = !vm.busy, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.logout))
+            }
         }
         TextButton(onClick = onServerSettings, enabled = !vm.busy, modifier = Modifier.fillMaxWidth()) {
             Text(stringResource(R.string.server_settings))
