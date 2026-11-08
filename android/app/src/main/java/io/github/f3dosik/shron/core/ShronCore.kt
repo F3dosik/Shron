@@ -22,6 +22,10 @@ data class CoreState(
     val unlocked: Boolean = false,
     /** Причина последней блокировки (Mobile.Lock*), пока хранилище заблокировано. */
     val lockReason: String? = null,
+    /** Сервер недоступен: записи — из копии на устройстве, изменения невозможны. */
+    val offline: Boolean = false,
+    /** Когда копия на устройстве последний раз получила записи с сервера, мс Unix; 0 — нет копии. */
+    val syncedAt: Long = 0,
 )
 
 /** Логин для подсказки автозаполнения — копия mobile.LoginMatch. */
@@ -134,6 +138,8 @@ class ShronCore(dataDir: File, insecure: Boolean) {
             login = s.login,
             unlocked = s.unlocked,
             lockReason = if (s.unlocked) null else lockReason,
+            offline = s.unlocked && s.offline,
+            syncedAt = s.syncedAt,
         )
     }
 }

@@ -449,6 +449,14 @@ func (v *Vault) loginIfNeededLocked(ctx context.Context) (locked bool) {
 	return false
 }
 
+// RetryServer просит при следующем чтении обратиться к серверу, даже если он недавно
+// не ответил (например, пользователь обновляет список вручную).
+func (v *Vault) RetryServer() {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	v.cache.retryAt = time.Time{}
+}
+
 // MasterKey возвращает копию мастер-ключа разблокированного хранилища, чтобы
 // сохранить его для UnlockWithKey. Ключ даёт полный доступ к секретам учётки: хранить
 // его можно только зашифрованным, например ключом Android Keystore.

@@ -285,6 +285,15 @@ func (a *App) AcceptKDFChange(login string) error {
 	return toError(v.ForgetKDFParams(strings.TrimSpace(login)))
 }
 
+// RetryServer просит при следующем чтении обратиться к серверу, даже если он недавно
+// не ответил: без этого после сбоя сети записи полминуты читаются из копии на
+// устройстве. Вызывается, когда пользователь обновляет список вручную.
+func (a *App) RetryServer() {
+	if v, err := a.currentVault(); err == nil {
+		v.RetryServer()
+	}
+}
+
 // Lock блокирует хранилище. Приложение вызывает его, например, при уходе в фон.
 func (a *App) Lock() {
 	if v, err := a.currentVault(); err == nil {
