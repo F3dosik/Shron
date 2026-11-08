@@ -6,9 +6,11 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.drawable.Icon
 import android.os.Build
+import android.os.Bundle
 import android.service.autofill.Dataset
 import android.service.autofill.FillResponse
 import android.service.autofill.InlinePresentation
+import android.service.autofill.SaveInfo
 import android.view.autofill.AutofillId
 import android.view.autofill.AutofillValue
 import android.view.inputmethod.InlineSuggestionsRequest
@@ -28,6 +30,9 @@ import io.github.f3dosik.shron.core.LoginMatch
  * Заполняемая форма: поля логина и пароля, сайт (в браузере) или приложение, и запрос
  * подсказок над клавиатурой (Android 11+, если клавиатура их поддерживает). Передаётся
  * окнам Shron через extras неизменяемого PendingIntent.
+ *
+ * [previousUsernameId] — поле логина с прошлого шага входа, если вход в два шага (почта,
+ * затем пароль на следующем экране): по нему логин найдётся при сохранении.
  */
 @RequiresApi(Build.VERSION_CODES.O)
 data class AutofillTarget(
@@ -36,14 +41,19 @@ data class AutofillTarget(
     val webDomain: String?,
     val packageName: String,
     val inlineRequest: InlineSuggestionsRequest?,
+    val previousUsernameId: AutofillId? = null,
 ) {
     val ids: List<AutofillId> get() = listOfNotNull(usernameId, passwordId)
+
+    /** Поле логина для сохранения: на этом экране или на прошлом шаге входа. */
+    val saveUsernameId: AutofillId? get() = usernameId ?: previousUsernameId
 
     fun putInto(intent: Intent): Intent = intent
         .putExtra(EXTRA_USERNAME_ID, usernameId)
         .putExtra(EXTRA_PASSWORD_ID, passwordId)
         .putExtra(EXTRA_WEB_DOMAIN, webDomain)
         .putExtra(EXTRA_PACKAGE, packageName)
+        .putExtra(EXTRA_PREVIOUS_USERNAME_ID, previousUsernameId)
         .apply {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && inlineRequest != null) {
                 putExtra(EXTRA_INLINE_REQUEST, inlineRequest)
@@ -56,6 +66,7 @@ data class AutofillTarget(
         private const val EXTRA_WEB_DOMAIN = "io.github.f3dosik.shron.autofill.WEB_DOMAIN"
         private const val EXTRA_PACKAGE = "io.github.f3dosik.shron.autofill.PACKAGE"
         private const val EXTRA_INLINE_REQUEST = "io.github.f3dosik.shron.autofill.INLINE_REQUEST"
+        private const val EXTRA_PREVIOUS_USERNAME_ID = "io.github.f3dosik.shron.autofill.PREVIOUS_USERNAME_ID"
 
         /** null — в intent нет формы (окно открыто не системой автозаполнения). */
         fun from(intent: Intent): AutofillTarget? {
@@ -68,7 +79,8 @@ data class AutofillTarget(
             } else {
                 null
             }
-            return AutofillTarget(username, password, intent.getStringExtra(EXTRA_WEB_DOMAIN), pkg, inline)
+            val previous = IntentCompat.getParcelableExtra(intent, EXTRA_PREVIOUS_USERNAME_ID, AutofillId::class.java)
+            return AutofillTarget(username, password, intent.getStringExtra(EXTRA_WEB_DOMAIN), pkg, inline, previous)
         }
     }
 }
@@ -100,7 +112,7 @@ object AutofillResponses {
             @Suppress("DEPRECATION")
             builder.setAuthentication(ids, sender, presentation)
         }
-        return builder.build()
+        return builder.setSaveData(target).build()
     }
 
     /**
@@ -139,7 +151,48 @@ object AutofillResponses {
                 ?.let { dataset.setInlinePresentationCompat(it) }
         }
         builder.addDataset(dataset.build())
-        return builder.build()
+        return builder.setSaveData(target).build()
+    }
+
+    /** Поля в состоянии ответа (FillResponse.clientState), по которым onSaveRequest найдёт значения. */
+    const val STATE_USERNAME_ID = "io.github.f3dosik.shron.autofill.state.USERNAME_ID"
+    const val STATE_PASSWORD_ID = "io.github.f3dosik.shron.autofill.state.PASSWORD_ID"
+
+    /**
+     * Предложение «Сохранить в Shron?» после входа (SaveInfo) и поля формы для
+     * onSaveRequest. Система показывает его, когда форма отправлена или скрылась, а
+     * введённое отличается от подставленного из Shron; если подставленный логин изменён,
+     * система предлагает обновить его.
+     *
+     * Экран только с логином — первый шаг входа в два шага: сохранение откладывается
+     * (FLAG_DELAY_SAVE, Android 10+) до экрана с паролем, а поле логина переходит в
+     * следующий запрос через clientState.
+     */
+    private fun FillResponse.Builder.setSaveData(target: AutofillTarget): FillResponse.Builder {
+        val usernameId = target.usernameId
+        val passwordId = target.passwordId
+        val info = when {
+            passwordId != null -> {
+                val type = SaveInfo.SAVE_DATA_TYPE_PASSWORD or
+                    (if (usernameId != null) SaveInfo.SAVE_DATA_TYPE_USERNAME else 0)
+                SaveInfo.Builder(type, arrayOf(passwordId))
+                    .apply { if (usernameId != null) setOptionalIds(arrayOf(usernameId)) }
+                    .setFlags(SaveInfo.FLAG_SAVE_ON_ALL_VIEWS_INVISIBLE)
+                    .build()
+            }
+            usernameId != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q ->
+                SaveInfo.Builder(SaveInfo.SAVE_DATA_TYPE_USERNAME, arrayOf(usernameId))
+                    .setFlags(SaveInfo.FLAG_SAVE_ON_ALL_VIEWS_INVISIBLE or SaveInfo.FLAG_DELAY_SAVE)
+                    .build()
+            else -> null
+        }
+        if (info != null) setSaveInfo(info)
+        return setClientState(
+            Bundle().apply {
+                putParcelable(STATE_USERNAME_ID, target.saveUsernameId)
+                putParcelable(STATE_PASSWORD_ID, passwordId)
+            },
+        )
     }
 
     // Неизменяемый PendingIntent: система не дописывает в него данные, всё нужное уже в

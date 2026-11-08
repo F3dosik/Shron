@@ -2,7 +2,6 @@ package io.github.f3dosik.shron.autofill
 
 import android.app.Activity
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.view.WindowManager
@@ -63,15 +62,5 @@ class AutofillPickerActivity : FragmentActivity() {
         passwordId?.let { dataset.setValueCompat(it, AutofillValue.forText(secret.password)) }
         setResult(Activity.RESULT_OK, Intent().putExtra(AutofillManager.EXTRA_AUTHENTICATION_RESULT, dataset.build()))
         finish()
-    }
-
-    /** Название приложения, которое просит заполнить форму; без доступа к нему — имя пакета. */
-    private fun appLabel(pkg: String?): String {
-        if (pkg == null) return ""
-        return try {
-            packageManager.getApplicationLabel(packageManager.getApplicationInfo(pkg, 0)).toString()
-        } catch (_: PackageManager.NameNotFoundException) {
-            pkg
-        }
     }
 }

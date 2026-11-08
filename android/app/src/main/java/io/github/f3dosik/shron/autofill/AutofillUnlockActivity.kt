@@ -74,7 +74,7 @@ class AutofillUnlockActivity : FragmentActivity() {
             ShronTheme {
                 UnlockSheet(
                     app = app,
-                    requester = target.webDomain ?: target.packageName,
+                    subtitle = getString(R.string.autofill_unlock_for, target.webDomain ?: target.packageName),
                     onUnlocked = { respond(app, target) },
                     onOpenApp = {
                         startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
@@ -107,10 +107,14 @@ class AutofillUnlockActivity : FragmentActivity() {
     }
 }
 
+/**
+ * Окно разблокировки поверх другого приложения. [subtitle] — для чего нужна разблокировка;
+ * [onUnlocked] вызывается, когда хранилище открыто.
+ */
 @Composable
-private fun UnlockSheet(
+internal fun UnlockSheet(
     app: ShronApplication,
-    requester: String,
+    subtitle: String,
     onUnlocked: suspend () -> Unit,
     onOpenApp: () -> Unit,
     onCancel: () -> Unit,
@@ -140,7 +144,7 @@ private fun UnlockSheet(
             Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(stringResource(R.string.autofill_unlock_title), style = MaterialTheme.typography.headlineSmall)
                 Text(
-                    stringResource(R.string.autofill_unlock_for, requester),
+                    subtitle,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
