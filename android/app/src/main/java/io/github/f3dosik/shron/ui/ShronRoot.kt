@@ -12,6 +12,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.f3dosik.shron.ShronApplication
 import io.github.f3dosik.shron.ui.account.SettingsScreen
 import io.github.f3dosik.shron.ui.account.AccountViewModel
+import io.github.f3dosik.shron.ui.account.TransferViewModel
 import io.github.f3dosik.shron.ui.auth.AuthViewModel
 import io.github.f3dosik.shron.ui.auth.CreateStandaloneScreen
 import io.github.f3dosik.shron.ui.common.accountName
@@ -141,8 +142,10 @@ fun ShronRoot(app: ShronApplication) {
 
             VaultRoute.Settings -> {
                 val vm: AccountViewModel = viewModel(key = "settings-$session") { AccountViewModel(app) }
+                val transfer: TransferViewModel = viewModel(key = "transfer-$session") { TransferViewModel(app) }
                 SettingsScreen(
                     vm = vm,
+                    transfer = transfer,
                     login = state.login,
                     serverAddress = state.serverAddress,
                     standalone = state.standalone,

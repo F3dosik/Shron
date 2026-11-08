@@ -277,3 +277,49 @@ func TestApp_Standalone(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), CodeNotSupported)
 }
+
+func newStandaloneApp(t *testing.T) *App {
+	t.Helper()
+	app, err := NewApp(t.TempDir(), true, nil)
+	require.NoError(t, err)
+	t.Cleanup(app.Close)
+	require.NoError(t, app.UseStandalone(5))
+	require.NoError(t, app.CreateStandalone("password-1"))
+	return app
+}
+
+func TestApp_ExportImport(t *testing.T) {
+	src := newStandaloneApp(t)
+	require.NoError(t, src.SaveSecret(&SecretInput{Name: "note", Type: TypeText, Text: "hello"}, false))
+	require.NoError(t, src.SaveSecret(&SecretInput{Name: "mail", Type: TypeCredentials, Login: "me", Password: "pw"}, false))
+	assert.True(t, strings.HasSuffix(src.ExportFileName(), ".gkx"))
+
+	_, err := src.ExportVault("short")
+	require.Error(t, err)
+	data, err := src.ExportVault("export-password")
+	require.NoError(t, err)
+
+	dst := newStandaloneApp(t)
+	require.NoError(t, dst.SaveSecret(&SecretInput{Name: "note", Type: TypeText, Text: "old"}, false))
+
+	_, err = dst.ImportVault(data, "wrong-password", false)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), CodeWrongPassword)
+	_, err = dst.ImportVault([]byte("not an export"), "export-password", false)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), CodeValidation)
+
+	result, err := dst.ImportVault(data, "export-password", false)
+	require.NoError(t, err)
+	assert.Equal(t, 2, result.Total)
+	assert.Equal(t, 1, result.Created)
+	assert.Equal(t, 1, result.Skipped)
+	assert.False(t, result.Interrupted)
+
+	result, err = dst.ImportVault(data, "export-password", true)
+	require.NoError(t, err)
+	assert.Equal(t, 2, result.Updated)
+	note, err := dst.GetSecret("note", TypeText)
+	require.NoError(t, err)
+	assert.Equal(t, "hello", note.Text)
+}
