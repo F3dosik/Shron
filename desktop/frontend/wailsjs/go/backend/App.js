@@ -102,6 +102,10 @@ export function Register(arg1, arg2) {
   return window['go']['backend']['App']['Register'](arg1, arg2);
 }
 
+export function RetryServer() {
+  return window['go']['backend']['App']['RetryServer']();
+}
+
 export function SaveSecret(arg1, arg2) {
   return window['go']['backend']['App']['SaveSecret'](arg1, arg2);
 }

@@ -49,6 +49,8 @@ import androidx.compose.ui.unit.dp
 import io.github.f3dosik.shron.R
 import io.github.f3dosik.shron.mobile.Mobile
 import io.github.f3dosik.shron.ui.common.ErrorMessage
+import io.github.f3dosik.shron.ui.common.OfflineNotice
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.f3dosik.shron.ui.common.rememberExternalActivity
 import java.text.DateFormat
 import java.util.Date
@@ -72,6 +74,7 @@ fun SecretScreen(
     var confirmDelete by remember { mutableStateOf(false) }
     var menu by remember { mutableStateOf(false) }
     val secret = vm.secret
+    val offline = vm.coreState.collectAsStateWithLifecycle().value.offline
 
     Scaffold(
         topBar = {
@@ -114,16 +117,22 @@ fun SecretScreen(
         Column(
             Modifier
                 .fillMaxSize()
-                .padding(padding)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+                .padding(padding),
         ) {
-            ErrorMessage(vm.error)
-            when {
-                secret != null -> SecretFields(vm, secret)
-                vm.busy -> CircularProgressIndicator(Modifier.align(Alignment.CenterHorizontally))
-                vm.error != null -> TextButton(onClick = vm::load) { Text(stringResource(R.string.retry)) }
+            if (offline) OfflineNotice(stringResource(R.string.offline_secret_notice))
+            Column(
+                Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                ErrorMessage(vm.error)
+                when {
+                    secret != null -> SecretFields(vm, secret)
+                    vm.busy -> CircularProgressIndicator(Modifier.align(Alignment.CenterHorizontally))
+                    vm.error != null -> TextButton(onClick = vm::load) { Text(stringResource(R.string.retry)) }
+                }
             }
         }
     }

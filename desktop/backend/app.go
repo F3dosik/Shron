@@ -315,6 +315,14 @@ func (a *App) Lock() {
 	}
 }
 
+// RetryServer просит при следующем чтении обратиться к серверу, даже если он недавно
+// не ответил: без этого после сбоя сети записи полминуты читаются из копии.
+func (a *App) RetryServer() {
+	if v, err := a.currentVault(); err == nil {
+		v.RetryServer()
+	}
+}
+
 // ChangePassword меняет мастер-пароль с перешифровкой всех секретов.
 // kdfTime и kdfMemoryMiB — параметры Argon2id для нового пароля.
 func (a *App) ChangePassword(oldPassword, newPassword string, kdfTime, kdfMemoryMiB int) error {

@@ -7,9 +7,11 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.f3dosik.shron.ShronApplication
+import io.github.f3dosik.shron.core.CoreState
 import io.github.f3dosik.shron.core.ShronCore
 import io.github.f3dosik.shron.core.ShronError
 import io.github.f3dosik.shron.mobile.Mobile
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
 /**
@@ -20,6 +22,9 @@ import kotlinx.coroutines.launch
 abstract class CoreViewModel(protected val app: ShronApplication) : ViewModel() {
 
     protected val core: ShronCore get() = app.core
+
+    /** Состояние ядра — например, чтобы показать, что сервер недоступен. */
+    val coreState: StateFlow<CoreState> get() = core.state
 
     var busy by mutableStateOf(false)
         private set

@@ -221,6 +221,8 @@ export namespace backend {
 	    autoLockMinutes: number;
 	    login: string;
 	    unlocked: boolean;
+	    offline: boolean;
+	    syncedAt: number;
 	    adminMode: boolean;
 	
 	    static createFrom(source: any = {}) {
@@ -235,6 +237,8 @@ export namespace backend {
 	        this.autoLockMinutes = source["autoLockMinutes"];
 	        this.login = source["login"];
 	        this.unlocked = source["unlocked"];
+	        this.offline = source["offline"];
+	        this.syncedAt = source["syncedAt"];
 	        this.adminMode = source["adminMode"];
 	    }
 	}

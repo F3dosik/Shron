@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import io.github.f3dosik.shron.R
 import io.github.f3dosik.shron.mobile.Mobile
 import io.github.f3dosik.shron.ui.common.ErrorMessage
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.f3dosik.shron.ui.common.FormScreen
 import io.github.f3dosik.shron.ui.common.GeneratorPanel
 import io.github.f3dosik.shron.ui.common.PasswordInput
@@ -56,7 +57,11 @@ fun SecretFormScreen(vm: SecretFormViewModel, onSaved: (SecretRef) -> Unit, onCl
     BackHandler(onBack = onClose)
     val enabled = !vm.busy
 
-    FormScreen(title = stringResource(if (vm.editing) R.string.secret_edit_title else R.string.secret_new_title)) {
+    val offline = vm.coreState.collectAsStateWithLifecycle().value.offline
+    FormScreen(
+        title = stringResource(if (vm.editing) R.string.secret_edit_title else R.string.secret_new_title),
+        subtitle = if (offline) stringResource(R.string.offline_form_notice) else null,
+    ) {
         SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
             types.forEachIndexed { index, (type, label) ->
                 SegmentedButton(
