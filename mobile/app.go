@@ -69,6 +69,12 @@ type State struct {
 	// Conflicts — сколько из них ждут решения пользователя (см. Conflicts).
 	PendingChanges int
 	Conflicts      int
+	// LocalRecords — записи только на этом устройстве (StatusLocal): при выходе из учётки
+	// или смене сервера они удаляются.
+	LocalRecords int
+	// StaleLocalRecords — записи только на этом устройстве, зашифрованные прежним паролем
+	// (его сменили на другом устройстве): см. RecoverLocalRecords.
+	StaleLocalRecords int
 }
 
 // App — клиент Shron.
@@ -136,6 +142,8 @@ func (a *App) GetState() *State {
 		state.Offline = offline
 		state.SyncedAt = unixMilli(syncedAt)
 		state.PendingChanges, state.Conflicts = a.vault.PendingChanges()
+		state.LocalRecords = a.vault.LocalRecords()
+		state.StaleLocalRecords = a.vault.StaleLocalRecords()
 	}
 	return state
 }
@@ -194,6 +202,7 @@ func (a *App) SaveSettings(address, caPEM string, useSavedCA bool, autoLockMinut
 		// Сессия и копия хранилища принадлежат другому серверу.
 		_ = os.Remove(filepath.Join(a.dir, sessionFile))
 		_ = offline.Remove(filepath.Join(a.dir, offline.FileName))
+		_ = offline.Remove(filepath.Join(a.dir, offline.FileName+offline.StaleSuffix))
 	}
 	a.settings = s
 	return a.openVaultLocked()

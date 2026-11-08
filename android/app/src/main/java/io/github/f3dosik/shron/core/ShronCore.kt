@@ -29,6 +29,10 @@ data class CoreState(
     /** Изменения, сделанные без сети и ещё не отправленные; из них — с конфликтом. */
     val pendingChanges: Int = 0,
     val conflicts: Int = 0,
+    /** Записи только на этом устройстве (и у заблокированного хранилища): при выходе или смене сервера удаляются. */
+    val localRecords: Int = 0,
+    /** Записи только на этом устройстве, зашифрованные прежним паролем (сменён на другом устройстве). */
+    val staleLocalRecords: Int = 0,
 )
 
 /** Логин для подсказки автозаполнения — копия mobile.LoginMatch. */
@@ -145,6 +149,8 @@ class ShronCore(dataDir: File, insecure: Boolean) {
             syncedAt = s.syncedAt,
             pendingChanges = if (s.unlocked) s.pendingChanges.toInt() else 0,
             conflicts = if (s.unlocked) s.conflicts.toInt() else 0,
+            localRecords = s.localRecords.toInt(),
+            staleLocalRecords = if (s.unlocked) s.staleLocalRecords.toInt() else 0,
         )
     }
 }

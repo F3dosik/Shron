@@ -59,6 +59,18 @@ func withoutCache(ctx context.Context) context.Context {
 	return context.WithValue(ctx, noCacheKey{}, true)
 }
 
+// localKey помечает контекст создания записи только на этом устройстве.
+type localKey struct{}
+
+func withLocal(ctx context.Context) context.Context {
+	return context.WithValue(ctx, localKey{}, true)
+}
+
+func isLocal(ctx context.Context) bool {
+	v, _ := ctx.Value(localKey{}).(bool)
+	return v
+}
+
 func newCachedClient(remote grpcclient.SecretsClient, path string, retryAfter time.Duration, queue bool) *cachedClient {
 	return &cachedClient{remote: remote, path: path, now: time.Now, retryAfter: retryAfter, queue: queue}
 }
@@ -168,8 +180,9 @@ func (c *cachedClient) GetSecret(ctx context.Context, blindIndex string) (*domai
 	if noCache(ctx) {
 		return c.remote.GetSecret(ctx, blindIndex)
 	}
-	// Неотправленное изменение важнее версии на сервере: показываем его.
-	if c.skipRemote(ctx) || c.findOp(blindIndex) >= 0 {
+	// Запись только на устройстве на сервере не ищем; неотправленное изменение
+	// важнее версии на сервере: показываем его.
+	if c.findLocal(blindIndex) >= 0 || c.skipRemote(ctx) || c.findOp(blindIndex) >= 0 {
 		return c.viewSecret(blindIndex)
 	}
 	rctx, cancel := c.readContext(ctx)
@@ -213,9 +226,22 @@ func (c *cachedClient) DeleteSecret(ctx context.Context, blindIndex string) erro
 func (c *cachedClient) write(
 	ctx context.Context, kind offline.OpKind, blindIndex string, data []byte, remote func(context.Context) error,
 ) error {
+	if isLocal(ctx) && kind == offline.OpCreate {
+		return c.createLocal(blindIndex, data)
+	}
 	if c.snap == nil || noCache(ctx) {
 		return remote(ctx)
 	}
+	if c.findLocal(blindIndex) >= 0 {
+		return c.writeLocal(kind, blindIndex, data)
+	}
+	return c.writeServer(ctx, kind, blindIndex, data, remote)
+}
+
+// writeServer — write для записи сервера.
+func (c *cachedClient) writeServer(
+	ctx context.Context, kind offline.OpKind, blindIndex string, data []byte, remote func(context.Context) error,
+) error {
 	if c.queue && (c.skipRemote(ctx) || c.findOp(blindIndex) >= 0) {
 		return c.enqueue(kind, blindIndex, data)
 	}
@@ -245,6 +271,110 @@ func (c *cachedClient) write(
 	}
 	c.save()
 	return nil
+}
+
+// createLocal создаёт запись только на этом устройстве.
+func (c *cachedClient) createLocal(blindIndex string, data []byte) error {
+	if c.snap == nil {
+		return ErrLocalUnavailable
+	}
+	if _, err := c.viewSecret(blindIndex); err == nil {
+		return domain.ErrAlreadyExists
+	}
+	now := c.now()
+	c.snap.Local = append(c.snap.Local, offline.Record{BlindIndex: blindIndex, Data: data, CreatedAt: now, UpdatedAt: now})
+	return c.saveStrict()
+}
+
+// writeLocal изменяет или удаляет запись только на этом устройстве.
+func (c *cachedClient) writeLocal(kind offline.OpKind, blindIndex string, data []byte) error {
+	i := c.findLocal(blindIndex)
+	switch kind {
+	case offline.OpCreate:
+		return domain.ErrAlreadyExists
+	case offline.OpDelete:
+		c.snap.Local = slices.Delete(c.snap.Local, i, i+1)
+	default:
+		c.snap.Local[i].Data, c.snap.Local[i].UpdatedAt = data, c.now()
+	}
+	return c.saveStrict()
+}
+
+// moveToServer отправляет запись только на этом устройстве на сервер (без сервера —
+// в очередь, если она включена) и убирает её из записей устройства.
+func (c *cachedClient) moveToServer(ctx context.Context, blindIndex string) error {
+	i := c.findLocal(blindIndex)
+	if i < 0 {
+		return domain.ErrNotFound
+	}
+	r := c.snap.Local[i]
+	c.snap.Local = slices.Delete(c.snap.Local, i, i+1)
+	err := c.write(ctx, offline.OpCreate, blindIndex, r.Data, func(ctx context.Context) error {
+		return c.remote.CreateSecret(ctx, blindIndex, r.Data)
+	})
+	if err != nil {
+		// Запись остаётся на устройстве (сохранённый файл её не терял: write при ошибке
+		// копию не записывает).
+		c.snap.Local = slices.Insert(c.snap.Local, min(i, len(c.snap.Local)), r)
+		return err
+	}
+	return c.saveStrict()
+}
+
+// moveToDevice переносит запись с сервера на устройство: сохраняет её как запись только
+// на этом устройстве и удаляет с сервера (без сервера — ставит удаление в очередь).
+// Запись с конфликтом не переносится, пока он не разрешён.
+func (c *cachedClient) moveToDevice(ctx context.Context, blindIndex string) error {
+	if c.snap == nil {
+		return ErrLocalUnavailable
+	}
+	if c.findLocal(blindIndex) >= 0 {
+		return nil
+	}
+	if i := c.findOp(blindIndex); i >= 0 && c.snap.Pending[i].Conflict != nil {
+		return ErrUnsyncedChanges
+	}
+	r, ok := c.viewRecord(blindIndex)
+	if !ok {
+		return domain.ErrNotFound
+	}
+	// Сначала запись сохраняется на устройстве, потом удаляется с сервера: так её не
+	// потерять, если удаление пройдёт, а приложение не успеет записать файл.
+	r.UpdatedAt = c.now()
+	c.snap.Local = append(c.snap.Local, r)
+	if err := c.saveStrict(); err != nil {
+		c.snap.Local = c.snap.Local[:len(c.snap.Local)-1]
+		return err
+	}
+	err := c.writeServer(ctx, offline.OpDelete, blindIndex, nil, func(ctx context.Context) error {
+		return c.remote.DeleteSecret(ctx, blindIndex)
+	})
+	if err != nil && !errors.Is(err, domain.ErrNotFound) {
+		c.snap.Local = c.snap.Local[:len(c.snap.Local)-1]
+		c.save()
+		return err
+	}
+	if errors.Is(err, domain.ErrNotFound) {
+		c.removeRecord(blindIndex)
+		c.save()
+	}
+	return nil
+}
+
+// localCount — число записей только на этом устройстве.
+func (c *cachedClient) localCount() int {
+	if c.snap == nil {
+		return 0
+	}
+	return len(c.snap.Local)
+}
+
+// localRecords возвращает копию записей только на этом устройстве.
+func (c *cachedClient) localRecords() []offline.Record {
+	if c.snap == nil {
+		return nil
+	}
+	return slices.Clone(c.snap.Local)
 }
 
 // enqueue ставит изменение в очередь, объединяя его с прежним изменением той же записи.
@@ -451,19 +581,24 @@ func (c *cachedClient) pendingOps() []offline.PendingOp {
 	return slices.Clone(c.snap.Pending)
 }
 
-// view — записи с учётом неотправленных изменений.
+// view — записи с учётом неотправленных изменений и записи только на этом устройстве.
+// Запись сервера с тем же blind index, что у записи устройства (её создали на другом
+// устройстве), скрыта: у записей одно название и тип.
 func (c *cachedClient) view() []*domain.Secret {
-	result := make([]*domain.Secret, 0, len(c.snap.Records)+len(c.snap.Pending))
+	result := make([]*domain.Secret, 0, len(c.snap.Records)+len(c.snap.Pending)+len(c.snap.Local))
 	for _, r := range c.snap.Records {
-		if v, ok := c.viewRecord(r.BlindIndex); ok {
+		if v, ok := c.viewRecord(r.BlindIndex); ok && c.findLocal(r.BlindIndex) < 0 {
 			result = append(result, toSecret(v))
 		}
 	}
 	for _, op := range c.snap.Pending {
-		if op.Kind != offline.OpDelete && c.findRecord(op.BlindIndex) < 0 {
+		if op.Kind != offline.OpDelete && c.findRecord(op.BlindIndex) < 0 && c.findLocal(op.BlindIndex) < 0 {
 			v, _ := c.viewRecord(op.BlindIndex)
 			result = append(result, toSecret(v))
 		}
+	}
+	for _, r := range c.snap.Local {
+		result = append(result, toSecret(r))
 	}
 	return result
 }
@@ -494,10 +629,20 @@ func (c *cachedClient) viewSecret(blindIndex string) (*domain.Secret, error) {
 	if c.snap == nil {
 		return nil, domain.ErrNotFound
 	}
+	if i := c.findLocal(blindIndex); i >= 0 {
+		return toSecret(c.snap.Local[i]), nil
+	}
 	if r, ok := c.viewRecord(blindIndex); ok {
 		return toSecret(r), nil
 	}
 	return nil, domain.ErrNotFound
+}
+
+func (c *cachedClient) findLocal(blindIndex string) int {
+	if c.snap == nil {
+		return -1
+	}
+	return slices.IndexFunc(c.snap.Local, func(r offline.Record) bool { return r.BlindIndex == blindIndex })
 }
 
 func (c *cachedClient) findRecord(blindIndex string) int {
@@ -536,10 +681,23 @@ func (c *cachedClient) removeRecord(blindIndex string) {
 // сервера и не хранит изменений, не записывается: пустая копия только помешала бы
 // понять, что данных без сети нет. Ошибка записи не мешает работе с сервером.
 func (c *cachedClient) save() {
-	if c.snap == nil || (c.snap.SyncedAt.IsZero() && len(c.snap.Pending) == 0) {
+	if c.snap == nil || c.snap.Empty() {
 		return
 	}
 	_ = offline.Save(c.path, c.key, c.snap)
+}
+
+// saveStrict записывает копию и возвращает ошибку записи: записи только на устройстве
+// больше нигде не хранятся, и о неудаче нужно сказать.
+func (c *cachedClient) saveStrict() error {
+	if c.snap == nil {
+		return ErrLocalUnavailable
+	}
+	if c.snap.Empty() {
+		// Последнюю запись устройства удалили, а с сервера копия ещё ничего не получала.
+		return offline.Remove(c.path)
+	}
+	return offline.Save(c.path, c.key, c.snap)
 }
 
 func hashData(data []byte) []byte {

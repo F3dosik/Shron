@@ -33,6 +33,8 @@ data class SecretDetails(
     val cardExpiry: String = "",
     val cardCvv: String = "",
     val fileSize: Long = 0,
+    /** Mobile.Status*: Mobile.StatusLocal — запись только на этом устройстве. */
+    val status: String = "",
 ) {
     companion object {
         fun from(s: Secret) = SecretDetails(
@@ -50,6 +52,7 @@ data class SecretDetails(
             cardExpiry = s.cardExpiry,
             cardCvv = s.cardCVV,
             fileSize = s.fileSize,
+            status = s.status,
         )
     }
 }
@@ -87,6 +90,13 @@ class SecretViewModel(app: ShronApplication, val ref: SecretRef) : CoreViewModel
             resolver.openOutputStream(uri, "wt")?.use { it.write(data) }
         } ?: throw validation(R.string.error_write_file)
         notice = string(R.string.file_saved)
+    }
+
+    /** Переносит запись на это устройство ([local]) или обратно на сервер. */
+    fun setLocal(local: Boolean) = run {
+        core.call { it.setLocal(ref.name, ref.type, local) }
+        secret = SecretDetails.from(core.call { it.getSecret(ref.name, ref.type) })
+        notice = string(if (local) R.string.moved_to_device else R.string.moved_to_server)
     }
 
     fun delete(onDeleted: () -> Unit) = run {

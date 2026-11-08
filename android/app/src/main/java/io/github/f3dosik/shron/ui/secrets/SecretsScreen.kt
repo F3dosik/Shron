@@ -60,6 +60,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.f3dosik.shron.R
 import io.github.f3dosik.shron.ui.common.OfflineNotice
+import io.github.f3dosik.shron.ui.common.PasswordInput
 import io.github.f3dosik.shron.mobile.Mobile
 import java.text.DateFormat
 import java.util.Date
@@ -81,6 +82,7 @@ fun SecretsScreen(
     }
     var menu by remember { mutableStateOf(false) }
     var confirmLogout by remember { mutableStateOf(false) }
+    var recoverStale by remember { mutableStateOf(false) }
     val coreState by vm.coreState.collectAsStateWithLifecycle()
 
     Scaffold(
@@ -104,7 +106,7 @@ fun SecretsScreen(
                                 text = { Text(stringResource(R.string.logout)) },
                                 onClick = {
                                     menu = false
-                                    if (coreState.pendingChanges > 0) confirmLogout = true else vm.logout()
+                                    if (coreState.pendingChanges > 0 || coreState.localRecords > 0) confirmLogout = true else vm.logout()
                                 },
                             )
                         }
@@ -125,6 +127,7 @@ fun SecretsScreen(
         ) {
             if (coreState.offline) OfflineBanner(coreState.syncedAt, coreState.pendingChanges)
             if (coreState.conflicts > 0) ConflictsBanner(coreState.conflicts, onConflicts)
+            if (coreState.staleLocalRecords > 0) StaleLocalBanner(coreState.staleLocalRecords, onClick = { recoverStale = true })
             PullToRefreshBox(
                 isRefreshing = vm.busy,
                 onRefresh = vm::refresh,
@@ -176,11 +179,27 @@ fun SecretsScreen(
         }
     }
 
+    if (recoverStale && coreState.staleLocalRecords > 0) {
+        RecoverStaleDialog(vm, coreState.staleLocalRecords, onDismiss = {
+            recoverStale = false
+            vm.dismissError()
+        })
+    }
+
     if (confirmLogout) {
         AlertDialog(
             onDismissRequest = { confirmLogout = false },
-            title = { Text(stringResource(R.string.logout_pending_title)) },
-            text = { Text(stringResource(R.string.logout_pending_text, coreState.pendingChanges)) },
+            title = {
+                Text(stringResource(if (coreState.pendingChanges > 0) R.string.logout_pending_title else R.string.logout_local_title))
+            },
+            text = {
+                Text(
+                    listOfNotNull(
+                        coreState.pendingChanges.takeIf { it > 0 }?.let { stringResource(R.string.logout_pending_text, it) },
+                        coreState.localRecords.takeIf { it > 0 }?.let { stringResource(R.string.logout_local_text, it) },
+                    ).joinToString("\n\n"),
+                )
+            },
             confirmButton = {
                 TextButton(onClick = {
                     confirmLogout = false
@@ -332,6 +351,11 @@ private fun SecretRow(item: SecretItem, onClick: () -> Unit) {
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    Mobile.StatusLocal -> Text(
+                        stringResource(R.string.status_local),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
                     Mobile.StatusConflict -> Text(
                         stringResource(R.string.status_conflict),
                         style = MaterialTheme.typography.labelSmall,
@@ -339,6 +363,86 @@ private fun SecretRow(item: SecretItem, onClick: () -> Unit) {
                     )
                 }
             }
+        },
+    )
+}
+
+/** Плашка записей устройства, зашифрованных прежним паролем: по нажатию — ввод прежнего пароля. */
+@Composable
+private fun StaleLocalBanner(count: Int, onClick: () -> Unit) {
+    Surface(
+        color = MaterialTheme.colorScheme.tertiaryContainer,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+        ) {
+            Icon(Icons.Filled.Lock, contentDescription = null, tint = MaterialTheme.colorScheme.onTertiaryContainer)
+            Text(
+                stringResource(R.string.stale_local_banner, count),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onTertiaryContainer,
+                modifier = Modifier.weight(1f),
+            )
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onTertiaryContainer)
+        }
+    }
+}
+
+/**
+ * Возврат записей устройства прежним паролем; если его не вспомнить — удаление
+ * (с подтверждением).
+ */
+@Composable
+private fun RecoverStaleDialog(vm: SecretsViewModel, count: Int, onDismiss: () -> Unit) {
+    var password by remember { mutableStateOf("") }
+    var confirmDiscard by remember { mutableStateOf(false) }
+    if (confirmDiscard) {
+        AlertDialog(
+            onDismissRequest = { confirmDiscard = false },
+            title = { Text(stringResource(R.string.stale_local_discard_title)) },
+            text = { Text(stringResource(R.string.stale_local_discard_text, count)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmDiscard = false
+                    vm.discardStale(onDismiss)
+                }) { Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmDiscard = false }) { Text(stringResource(R.string.cancel)) }
+            },
+        )
+        return
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.stale_local_title)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(stringResource(R.string.stale_local_text))
+                PasswordInput(
+                    value = password,
+                    onValueChange = { password = it },
+                    label = stringResource(R.string.stale_local_password),
+                    enabled = !vm.busy,
+                )
+                vm.error?.let { Text(it.message, color = MaterialTheme.colorScheme.error) }
+                TextButton(onClick = { confirmDiscard = true }, enabled = !vm.busy) {
+                    Text(stringResource(R.string.stale_local_discard), color = MaterialTheme.colorScheme.error)
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { vm.recoverStale(password, onDismiss) }, enabled = !vm.busy && password.isNotEmpty()) {
+                Text(stringResource(R.string.stale_local_recover))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
         },
     )
 }

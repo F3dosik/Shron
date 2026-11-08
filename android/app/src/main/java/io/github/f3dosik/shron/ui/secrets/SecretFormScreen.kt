@@ -4,6 +4,9 @@ import android.text.format.Formatter
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.text.KeyboardOptions
@@ -18,6 +21,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -25,6 +29,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -60,7 +65,7 @@ fun SecretFormScreen(vm: SecretFormViewModel, onSaved: (SecretRef) -> Unit, onCl
     val offline = vm.coreState.collectAsStateWithLifecycle().value.offline
     FormScreen(
         title = stringResource(if (vm.editing) R.string.secret_edit_title else R.string.secret_new_title),
-        subtitle = if (offline) stringResource(R.string.offline_form_notice) else null,
+        subtitle = if (offline && !vm.localOnly) stringResource(R.string.offline_form_notice) else null,
     ) {
         SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
             types.forEachIndexed { index, (type, label) ->
@@ -106,6 +111,21 @@ fun SecretFormScreen(vm: SecretFormViewModel, onSaved: (SecretRef) -> Unit, onCl
             supportingText = stringResource(R.string.secret_metadata_hint),
             enabled = enabled,
         )
+
+        // Где хранить запись, выбирается при создании; потом — переносом в карточке записи.
+        if (!vm.editing) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(Modifier.weight(1f)) {
+                    Text(stringResource(R.string.secret_local_only), style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        stringResource(R.string.secret_local_only_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Switch(checked = vm.localOnly, onCheckedChange = { vm.localOnly = it }, enabled = enabled)
+            }
+        }
 
         ErrorMessage(vm.error)
         PrimaryButton(stringResource(R.string.save), busy = vm.busy) { vm.save(onSaved) }

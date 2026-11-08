@@ -1,5 +1,6 @@
 package io.github.f3dosik.shron.ui.account
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import android.os.Build
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
@@ -160,7 +161,13 @@ fun SettingsScreen(
         AlertDialog(
             onDismissRequest = { confirmLogoutAll = false },
             title = { Text(stringResource(R.string.logout_everywhere)) },
-            text = { Text(stringResource(R.string.logout_everywhere_confirm)) },
+            text = {
+                val localRecords = vm.coreState.collectAsStateWithLifecycle().value.localRecords
+                Text(
+                    stringResource(R.string.logout_everywhere_confirm) +
+                        if (localRecords > 0) "\n\n" + stringResource(R.string.logout_local_text, localRecords) else "",
+                )
+            },
             confirmButton = {
                 TextButton(onClick = {
                     confirmLogoutAll = false

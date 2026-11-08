@@ -32,6 +32,9 @@ class SecretFormViewModel(app: ShronApplication, val existing: SecretDetails? = 
     var metadata by mutableStateOf("")
     var group by mutableStateOf("")
 
+    /** Новая запись — только на этом устройстве, без отправки на сервер. */
+    var localOnly by mutableStateOf(false)
+
     /** Существующие группы — подсказки к полю группы. */
     var groups by mutableStateOf<List<String>>(emptyList())
         private set
@@ -119,6 +122,7 @@ class SecretFormViewModel(app: ShronApplication, val existing: SecretDetails? = 
             type = this@SecretFormViewModel.type
             metadata = this@SecretFormViewModel.metadata
             group = this@SecretFormViewModel.group
+            localOnly = this@SecretFormViewModel.localOnly && !editing
             when (this@SecretFormViewModel.type) {
                 Mobile.TypeCredentials -> {
                     login = this@SecretFormViewModel.login
