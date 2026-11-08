@@ -174,6 +174,30 @@
     <string name="logout_pending_title">Есть неотправленные изменения</string>
     <string name="logout_pending_text">Изменений, сделанных без сети и ещё не отправленных на сервер: %1$d. После выхода они пропадут.</string>
     <string name="logout_anyway">Всё равно выйти</string>
+    <string name="logout_local_title">Есть записи только на этом устройстве</string>
+    <string name="logout_local_text">Записей только на этом устройстве: %1$d. После выхода они удалятся с телефона, а на сервере их нет. Чтобы сохранить, сначала перенесите их на сервер.</string>
+
+    <!-- Записи только на этом устройстве -->
+    <string name="secret_local_only">Только на этом устройстве</string>
+    <string name="secret_local_only_hint">Запись не отправится на сервер и не появится на других устройствах. Если телефон потеряется или вы выйдете из аккаунта, она пропадёт.</string>
+    <string name="status_local">на устройстве</string>
+    <string name="secret_local_notice">Запись хранится только на этом телефоне и не отправляется на сервер.</string>
+    <string name="move_to_device">Хранить только на телефоне</string>
+    <string name="move_to_server">Перенести на сервер</string>
+    <string name="move_to_device_title">Хранить только на этом телефоне?</string>
+    <string name="move_to_device_text">Запись «%1$s» удалится с сервера и с других устройств и останется только здесь. Если телефон потеряется или вы выйдете из аккаунта, она пропадёт.</string>
+    <string name="move_to_device_confirm">Перенести</string>
+    <string name="moved_to_device">Запись теперь только на этом телефоне</string>
+    <string name="moved_to_server">Запись перенесена на сервер</string>
+    <string name="server_local_warning">На телефоне есть записи только на этом устройстве (%1$d). При смене сервера они удалятся.</string>
+    <string name="stale_local_banner">Записей только на этом устройстве, зашифрованных прежним паролем: %1$d. Пароль сменили на другом устройстве — нажмите, чтобы вернуть их.</string>
+    <string name="stale_local_title">Вернуть записи с телефона</string>
+    <string name="stale_local_text">Введите мастер-пароль, который был до смены. Если его не вспомнить, записи можно только удалить.</string>
+    <string name="stale_local_password">Прежний пароль</string>
+    <string name="stale_local_recover">Вернуть</string>
+    <string name="stale_local_discard">Удалить записи</string>
+    <string name="stale_local_discard_title">Удалить записи без восстановления?</string>
+    <string name="stale_local_discard_text">Записи (%1$d) удалятся с телефона навсегда.</string>
 
     <!-- Конфликты изменений, сделанных без сети -->
     <string name="conflicts_title">Конфликты</string>

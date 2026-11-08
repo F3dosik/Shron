@@ -198,6 +198,9 @@ func (v *Vault) syncLocked(ctx context.Context) {
 // statusOf — состояние записи относительно сервера. Вызывается под v.mu.
 func (v *Vault) statusOf(svc service.SecretsService, name string, t domain.SecretType) SyncStatus {
 	bi := svc.BlindIndex(name, t)
+	if v.cache.findLocal(bi) >= 0 {
+		return StatusLocal
+	}
 	for _, op := range v.cache.pendingOps() {
 		if op.BlindIndex == bi {
 			if op.Conflict != nil {

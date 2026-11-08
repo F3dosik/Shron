@@ -15,7 +15,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
-/** Плашка во всю ширину экрана: сервер недоступен, данные — из копии на телефоне. */
+/** Информационная плашка во всю ширину экрана: например, сервер недоступен и данные — из копии на телефоне. */
 @Composable
 fun OfflineNotice(text: String, modifier: Modifier = Modifier) {
     Surface(color = MaterialTheme.colorScheme.secondaryContainer, modifier = modifier.fillMaxWidth()) {

@@ -94,6 +94,19 @@ class SecretsViewModel(app: ShronApplication) : CoreViewModel(app) {
 
     fun lock() = core.lock()
 
+    /** Возвращает записи устройства, зашифрованные прежним паролем [oldPassword]. */
+    fun recoverStale(oldPassword: String, onDone: () -> Unit) = run {
+        core.call { it.recoverLocalRecords(oldPassword) }
+        loadItems()
+        onDone()
+    }
+
+    /** Удаляет записи устройства, зашифрованные прежним паролем. */
+    fun discardStale(onDone: () -> Unit) = run {
+        core.call { it.discardStaleLocalRecords() }
+        onDone()
+    }
+
     fun logout() = run {
         core.call { it.logout(false) }
         app.biometric.clear()

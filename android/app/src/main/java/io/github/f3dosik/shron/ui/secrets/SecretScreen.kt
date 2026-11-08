@@ -72,6 +72,7 @@ fun SecretScreen(
         }
     }
     var confirmDelete by remember { mutableStateOf(false) }
+    var confirmMoveToDevice by remember { mutableStateOf(false) }
     var menu by remember { mutableStateOf(false) }
     val secret = vm.secret
     val offline = vm.coreState.collectAsStateWithLifecycle().value.offline
@@ -96,6 +97,14 @@ fun SecretScreen(
                                 Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.secret_menu))
                             }
                             DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                                val local = secret.status == Mobile.StatusLocal
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(if (local) R.string.move_to_server else R.string.move_to_device)) },
+                                    onClick = {
+                                        menu = false
+                                        if (local) vm.setLocal(false) else confirmMoveToDevice = true
+                                    },
+                                )
                                 DropdownMenuItem(
                                     text = { Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error) },
                                     leadingIcon = {
@@ -119,7 +128,11 @@ fun SecretScreen(
                 .fillMaxSize()
                 .padding(padding),
         ) {
-            if (offline) OfflineNotice(stringResource(R.string.offline_secret_notice))
+            if (secret?.status == Mobile.StatusLocal) {
+                OfflineNotice(stringResource(R.string.secret_local_notice))
+            } else if (offline) {
+                OfflineNotice(stringResource(R.string.offline_secret_notice))
+            }
             Column(
                 Modifier
                     .fillMaxSize()
@@ -135,6 +148,23 @@ fun SecretScreen(
                 }
             }
         }
+    }
+
+    if (confirmMoveToDevice) {
+        AlertDialog(
+            onDismissRequest = { confirmMoveToDevice = false },
+            title = { Text(stringResource(R.string.move_to_device_title)) },
+            text = { Text(stringResource(R.string.move_to_device_text, vm.ref.name)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmMoveToDevice = false
+                    vm.setLocal(true)
+                }) { Text(stringResource(R.string.move_to_device_confirm)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmMoveToDevice = false }) { Text(stringResource(R.string.cancel)) }
+            },
+        )
     }
 
     if (confirmDelete) {

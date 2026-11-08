@@ -34,7 +34,7 @@ type SecretSummary struct {
 	CreatedAt int64
 	UpdatedAt int64
 	// Status — StatusSynced, StatusPending (изменено без сети, не отправлено) или
-	// StatusConflict (не отправлено из-за конфликта).
+	// StatusConflict (не отправлено из-за конфликта), StatusLocal (только на этом устройстве).
 	Status string
 }
 
@@ -65,6 +65,8 @@ type Secret struct {
 	Group     string
 	CreatedAt int64
 	UpdatedAt int64
+	// Status — как SecretSummary.Status.
+	Status string
 
 	// credentials
 	Login    string
@@ -103,6 +105,10 @@ type SecretInput struct {
 	CardHolder string
 	CardExpiry string
 	CardCVV    string
+
+	// LocalOnly — при создании: хранить запись только на этом устройстве, не отправляя
+	// на сервер. При изменении не учитывается (см. App.SetLocal).
+	LocalOnly bool
 
 	// FileData — содержимое бинарного секрета (на Android — прочитанное через
 	// ContentResolver). При изменении пустое значение оставляет прежнее содержимое.
@@ -148,7 +154,12 @@ func (a *App) GetSecret(name, secretType string) (*Secret, error) {
 	if err != nil {
 		return nil, toError(err)
 	}
-	return toSecret(info)
+	s, err := toSecret(info)
+	if err != nil {
+		return nil, err
+	}
+	s.Status = string(v.SecretStatus(name, t))
+	return s, nil
 }
 
 // GetFileContent возвращает содержимое бинарного секрета, например для сохранения
@@ -184,6 +195,9 @@ func (a *App) SaveSecret(input *SecretInput, update bool) error {
 	}
 	if update {
 		return toError(v.UpdateSecret(context.Background(), payload))
+	}
+	if input.LocalOnly {
+		return toError(v.CreateLocalSecret(context.Background(), payload))
 	}
 	return toError(v.CreateSecret(context.Background(), payload))
 }

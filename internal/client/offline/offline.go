@@ -8,6 +8,11 @@
 // Весь файл подписан HMAC-SHA256 ключом HKDF(masterKey, "offline-cache"). Подпись
 // служит двум целям: проверяет пароль без сервера (неверный пароль даёт другой ключ)
 // и не даёт незаметно подменить соль, параметры или набор записей в файле.
+//
+// Кроме копии записей сервера, файл хранит записи «только на этом устройстве»
+// (Snapshot.Local): они зашифрованы так же, но на сервер не отправляются. Поэтому файл
+// с такими записями нельзя просто удалить: если его подпись не сходится (пароль сменили
+// на другом устройстве), он откладывается (Archive) до ввода прежнего пароля.
 package offline
 
 import (
@@ -26,6 +31,10 @@ import (
 
 // FileName — имя файла копии; лежит рядом с файлом сессии.
 const FileName = "offline_vault.json"
+
+// StaleSuffix — суффикс отложенной копии (Archive): записи только на этом устройстве,
+// зашифрованные прежним паролем.
+const StaleSuffix = ".old"
 
 // version — версия формата файла.
 const version = 1
@@ -58,6 +67,15 @@ type Snapshot struct {
 	// Pending — изменения, сделанные без сервера и ещё не отправленные: по одному на
 	// запись, в порядке первого изменения. Список показывает записи с их учётом.
 	Pending []PendingOp `json:"pending,omitempty"`
+	// Local — записи только на этом устройстве: на сервер не отправляются, в Records
+	// не попадают. Blind index не пересекается с записями сервера, которые видит клиент.
+	Local []Record `json:"local,omitempty"`
+}
+
+// Empty сообщает, что в копии нет ничего, кроме сведений об учётке: записи с сервера
+// ни разу не получены, изменений и записей только на устройстве нет.
+func (s *Snapshot) Empty() bool {
+	return s.SyncedAt.IsZero() && len(s.Pending) == 0 && len(s.Local) == 0
 }
 
 // OpKind — вид изменения без сервера.
@@ -209,6 +227,15 @@ func Save(path string, masterKey []byte, snapshot *Snapshot) error {
 // Remove удаляет копию; отсутствие файла — не ошибка.
 func Remove(path string) error {
 	if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("offline: %w", err)
+	}
+	return nil
+}
+
+// Archive откладывает копию path в path+StaleSuffix (заменяя прежнюю отложенную);
+// отсутствие файла — не ошибка.
+func Archive(path string) error {
+	if err := os.Rename(path, path+StaleSuffix); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return fmt.Errorf("offline: %w", err)
 	}
 	return nil

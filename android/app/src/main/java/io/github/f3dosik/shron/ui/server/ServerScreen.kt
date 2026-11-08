@@ -1,5 +1,6 @@
 package io.github.f3dosik.shron.ui.server
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import android.content.Intent
 import android.os.Build
 import android.provider.Settings
@@ -101,6 +102,14 @@ fun ServerScreen(vm: ServerViewModel, onSaved: () -> Unit, onClose: (() -> Unit)
 
         BackgroundLockChoice(vm.backgroundLockSeconds, { vm.backgroundLockSeconds = it }, enabled = !vm.busy)
 
+        val localRecords = vm.coreState.collectAsStateWithLifecycle().value.localRecords
+        if (localRecords > 0) {
+            Text(
+                stringResource(R.string.server_local_warning, localRecords),
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        }
         ErrorMessage(vm.error)
         InfoMessage(vm.checkResult)
 

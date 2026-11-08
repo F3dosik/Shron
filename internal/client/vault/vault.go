@@ -102,7 +102,8 @@ type SecretSummary struct {
 	Group     string
 	CreatedAt time.Time
 	UpdatedAt time.Time
-	// Status — отправлено ли изменение записи на сервер.
+	// Status — отправлено ли изменение записи на сервер; StatusLocal — запись только
+	// на этом устройстве.
 	Status SyncStatus
 }
 
@@ -393,7 +394,7 @@ func (v *Vault) loadCache(login string) (*offline.Sealed, error) {
 		return nil, errNoCache
 	}
 	snap := sealed.Unverified()
-	if snap.Server != v.cfg.ServerAddress || !strings.EqualFold(snap.Login, login) || snap.SyncedAt.IsZero() {
+	if snap.Server != v.cfg.ServerAddress || !strings.EqualFold(snap.Login, login) || (snap.SyncedAt.IsZero() && len(snap.Local) == 0) {
 		return nil, errNoCache
 	}
 	return sealed, nil
@@ -420,6 +421,11 @@ func (v *Vault) attachCacheLocked(login string, masterKey []byte) {
 	if sealed, err := v.loadCache(login); err == nil {
 		if prev, err := sealed.Open(masterKey); err == nil {
 			snap = prev
+		} else if len(sealed.Unverified().Local) > 0 {
+			// Копия подписана прежним ключом (пароль сменили на другом устройстве), а в ней
+			// записи только на этом устройстве: откладываем её до ввода прежнего пароля
+			// (RecoverLocalRecords).
+			_ = offline.Archive(v.cfg.CachePath)
 		} else {
 			// Копия подписана прежним ключом (пароль сменили): она больше не откроется.
 			v.removeCache()
@@ -575,6 +581,14 @@ func (v *Vault) GetSecret(ctx context.Context, name string, secretType domain.Se
 	return result, err
 }
 
+// CreateLocalSecret создаёт секрет только на этом устройстве: он хранится в копии
+// (Config.CachePath) и на сервер не отправляется. См. SetLocal.
+func (v *Vault) CreateLocalSecret(ctx context.Context, payload *domain.SecretPayload) error {
+	return v.withSecrets(ctx, v.cfg.RequestTimeout, func(ctx context.Context, svc service.SecretsService) error {
+		return svc.CreateSecret(withLocal(ctx), payload)
+	})
+}
+
 // CreateSecret создаёт секрет.
 func (v *Vault) CreateSecret(ctx context.Context, payload *domain.SecretPayload) error {
 	return v.withSecrets(ctx, v.cfg.RequestTimeout, func(ctx context.Context, svc service.SecretsService) error {
@@ -607,13 +621,25 @@ func (v *Vault) ChangePassword(ctx context.Context, oldPassword, newPassword str
 		return err
 	}
 	err := v.withSecrets(withoutCache(ctx), bulkTimeout, func(ctx context.Context, svc service.SecretsService) error {
+		// Записи только на устройстве сервер не перешифрует: перешифровываем их сами и
+		// после смены пароля сохраняем в копию, подписанную новым ключом.
+		var local *localReseal
+		defer func() { local.wipe() }()
 		reencrypt := func(newMasterKey []byte) ([]domain.ReencryptedSecret, error) {
+			local.wipe()
+			var err error
+			if local, err = v.resealLocalLocked(svc, newMasterKey); err != nil {
+				return nil, err
+			}
 			return svc.Reencrypt(ctx, newMasterKey)
 		}
 		err := v.auth.ChangePassword(ctx, v.login, oldPassword, newPassword, kdf, reencrypt)
 		if errors.Is(err, domain.ErrInvalidCredentials) {
 			// Здесь это неверный текущий пароль, а не отозванный токен.
 			return ErrWrongPassword
+		}
+		if err == nil {
+			v.saveResealedLocked(local)
 		}
 		return err
 	})
@@ -637,7 +663,7 @@ func (v *Vault) Logout(ctx context.Context, allSessions bool) error {
 	}
 	locked := v.lockLocked()
 	v.login = ""
-	v.removeCache()
+	v.removeAllCaches()
 	v.mu.Unlock()
 	if locked {
 		v.notifyLock(LockSignedOut)
@@ -662,7 +688,7 @@ func (v *Vault) DeleteAccount(ctx context.Context, password string) error {
 	}
 	locked := v.lockLocked()
 	v.login = ""
-	v.removeCache()
+	v.removeAllCaches()
 	v.mu.Unlock()
 	if locked {
 		v.notifyLock(LockSignedOut)
@@ -691,10 +717,19 @@ func (v *Vault) flushPending(ctx context.Context) error {
 	return nil
 }
 
-// removeCache удаляет копию на устройстве (выход, удаление учётки).
+// removeCache удаляет копию на устройстве.
 func (v *Vault) removeCache() {
 	if v.cfg.CachePath != "" {
 		_ = offline.Remove(v.cfg.CachePath)
+	}
+}
+
+// removeAllCaches удаляет копию и отложенную копию (выход, удаление учётки): записи
+// только на этом устройстве удаляются вместе с ними.
+func (v *Vault) removeAllCaches() {
+	v.removeCache()
+	if v.cfg.CachePath != "" {
+		_ = offline.Remove(v.cfg.CachePath + offline.StaleSuffix)
 	}
 }
 
