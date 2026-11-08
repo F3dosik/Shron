@@ -17,9 +17,11 @@ data class SecretItem(
     val updatedAt: Long,
     /** Группа; пусто — без группы. */
     val group: String = "",
+    /** Mobile.Status*: отправлено ли изменение на сервер. */
+    val status: String = "",
 ) {
     companion object {
-        fun from(s: SecretSummary) = SecretItem(s.name, s.type, s.metadata, s.updatedAt, s.group)
+        fun from(s: SecretSummary) = SecretItem(s.name, s.type, s.metadata, s.updatedAt, s.group, s.status)
     }
 }
 

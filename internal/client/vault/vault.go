@@ -61,6 +61,10 @@ type Config struct {
 	SessionPath string
 	// CachePath — файл копии хранилища для работы без сервера; пустой — без копии.
 	CachePath string
+	// OfflineWrites — без сервера ставить изменения в очередь и отправлять их при
+	// подключении (с разрешением конфликтов, см. Conflicts). Без него без сервера
+	// хранилище только для чтения. Включать, только если интерфейс показывает конфликты.
+	OfflineWrites bool
 	// OfflineRetryAfter — сколько после неудачного обращения к серверу читать из копии,
 	// не обращаясь к нему; 0 — 30 секунд.
 	OfflineRetryAfter time.Duration
@@ -163,7 +167,7 @@ func Open(cfg Config) (*Vault, error) {
 		cfg:    cfg,
 		conn:   conn,
 		tokens: tokens,
-		cache:  newCachedClient(grpcclient.NewSecretsClient(pb.NewSecretsClient(conn)), cfg.CachePath, cfg.OfflineRetryAfter),
+		cache:  newCachedClient(grpcclient.NewSecretsClient(pb.NewSecretsClient(conn)), cfg.CachePath, cfg.OfflineRetryAfter, cfg.OfflineWrites),
 		pins:   pins,
 		login:  login,
 	}

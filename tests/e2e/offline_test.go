@@ -97,6 +97,7 @@ func TestE2E_Vault_Offline(t *testing.T) {
 	configure := func(cfg *vault.Config) {
 		cfg.ServerAddress = proxy.addr
 		cfg.CachePath = cachePath
+		cfg.OfflineWrites = true
 		cfg.OfflineRetryAfter = 100 * time.Millisecond
 	}
 	v, _, login := newVaultUserAt(t, filepath.Join(dir, "session"), configure)
@@ -241,6 +242,7 @@ func TestE2E_Vault_OfflineConflict(t *testing.T) {
 	phone, _, login := newVaultUserAt(t, filepath.Join(dir, "session"), func(cfg *vault.Config) {
 		cfg.ServerAddress = proxy.addr
 		cfg.CachePath = filepath.Join(dir, offline.FileName)
+		cfg.OfflineWrites = true
 		cfg.OfflineRetryAfter = 100 * time.Millisecond
 	})
 	laptop, _ := openVault(t, filepath.Join(t.TempDir(), "session"), nil)

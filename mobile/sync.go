@@ -175,6 +175,6 @@ func differences(mine, server *domain.SecretPayload) []string {
 		}
 	}
 	add("комментарий", m.Metadata, s.Metadata)
-	add("группа", m.Group, s.Group)
+	add("папка", m.Group, s.Group)
 	return diff
 }

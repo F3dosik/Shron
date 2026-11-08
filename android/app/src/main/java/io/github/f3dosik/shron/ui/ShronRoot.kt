@@ -17,6 +17,8 @@ import io.github.f3dosik.shron.ui.auth.KdfDowngradeDialog
 import io.github.f3dosik.shron.ui.auth.PasswordChangeScreen
 import io.github.f3dosik.shron.ui.auth.SignInScreen
 import io.github.f3dosik.shron.ui.auth.UnlockScreen
+import io.github.f3dosik.shron.ui.secrets.ConflictsScreen
+import io.github.f3dosik.shron.ui.secrets.ConflictsViewModel
 import io.github.f3dosik.shron.ui.secrets.SecretDetails
 import io.github.f3dosik.shron.ui.secrets.SecretFormScreen
 import io.github.f3dosik.shron.ui.secrets.SecretFormViewModel
@@ -35,6 +37,7 @@ sealed interface VaultRoute {
     data class View(val ref: SecretRef) : VaultRoute
     data class Edit(val secret: SecretDetails) : VaultRoute
     data object Settings : VaultRoute
+    data object Conflicts : VaultRoute
 }
 
 /**
@@ -102,7 +105,13 @@ fun ShronRoot(app: ShronApplication) {
                     onAdd = { nav.open(VaultRoute.Add) },
                     onOpen = { nav.open(VaultRoute.View(it)) },
                     onSettings = { nav.open(VaultRoute.Settings) },
+                    onConflicts = { nav.open(VaultRoute.Conflicts) },
                 )
+            }
+
+            VaultRoute.Conflicts -> {
+                val vm: ConflictsViewModel = viewModel(key = "conflicts-$session") { ConflictsViewModel(app) }
+                ConflictsScreen(vm = vm, onBack = { nav.open(VaultRoute.List) })
             }
 
             VaultRoute.Add -> {

@@ -378,6 +378,7 @@ func (a *App) dialVaultLocked() error {
 		Insecure:      a.insecure,
 		SessionPath:   filepath.Join(a.dir, sessionFile),
 		CachePath:     filepath.Join(a.dir, offline.FileName),
+		OfflineWrites: true,
 		AutoLockAfter: time.Duration(a.settings.AutoLockMinutes) * time.Minute,
 		OnLock: func(reason vault.LockReason) {
 			if a.listener != nil {

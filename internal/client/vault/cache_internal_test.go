@@ -88,7 +88,7 @@ func (f *fakeRemote) DeleteSecret(_ context.Context, bi string) error {
 func newTestCache(t *testing.T) (*cachedClient, *fakeRemote, *time.Time) {
 	t.Helper()
 	remote := newFakeRemote()
-	c := newCachedClient(remote, filepath.Join(t.TempDir(), offline.FileName), 30*time.Second)
+	c := newCachedClient(remote, filepath.Join(t.TempDir(), offline.FileName), 30*time.Second, true)
 	now := time.Date(2026, 11, 8, 12, 0, 0, 0, time.UTC)
 	c.now = func() time.Time { return now }
 	c.attach(&offline.Snapshot{Server: "s", Login: "alice"}, []byte("key"), false)
@@ -302,4 +302,17 @@ func TestCachedClientMineConflictsAgainIfChangedMeanwhile(t *testing.T) {
 	require.NotNil(t, ops[0].Conflict)
 	assert.Equal(t, []byte("other-2"), ops[0].Conflict.ServerData)
 	assert.Equal(t, []byte("other-2"), remote.secrets["bi"].Data)
+}
+
+func TestCachedClientReadOnlyWithoutQueue(t *testing.T) {
+	ctx := context.Background()
+	c, remote, _ := newTestCache(t)
+	c.queue = false
+	require.NoError(t, c.CreateSecret(ctx, "bi", []byte("v1")))
+	_, err := c.ListSecrets(ctx)
+	require.NoError(t, err)
+
+	remote.down = true
+	assert.ErrorIs(t, c.UpdateSecret(ctx, "bi", []byte("v2")), domain.ErrUnavailable)
+	assert.Empty(t, c.pendingOps())
 }

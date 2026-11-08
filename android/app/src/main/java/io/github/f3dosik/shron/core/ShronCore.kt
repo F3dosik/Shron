@@ -26,6 +26,9 @@ data class CoreState(
     val offline: Boolean = false,
     /** Когда копия на устройстве последний раз получила записи с сервера, мс Unix; 0 — нет копии. */
     val syncedAt: Long = 0,
+    /** Изменения, сделанные без сети и ещё не отправленные; из них — с конфликтом. */
+    val pendingChanges: Int = 0,
+    val conflicts: Int = 0,
 )
 
 /** Логин для подсказки автозаполнения — копия mobile.LoginMatch. */
@@ -140,6 +143,8 @@ class ShronCore(dataDir: File, insecure: Boolean) {
             lockReason = if (s.unlocked) null else lockReason,
             offline = s.unlocked && s.offline,
             syncedAt = s.syncedAt,
+            pendingChanges = if (s.unlocked) s.pendingChanges.toInt() else 0,
+            conflicts = if (s.unlocked) s.conflicts.toInt() else 0,
         )
     }
 }

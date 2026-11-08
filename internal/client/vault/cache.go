@@ -37,6 +37,8 @@ type cachedClient struct {
 	now  func() time.Time
 	// retryAfter — сколько после сбоя сети читать из копии, не обращаясь к серверу.
 	retryAfter time.Duration
+	// queue — изменения без сервера ставятся в очередь; иначе возвращается ошибка сети.
+	queue bool
 
 	// snap — проверенная копия разблокированной учётки; nil — копии нет (хранилище
 	// заблокировано или копия выключена).
@@ -57,8 +59,8 @@ func withoutCache(ctx context.Context) context.Context {
 	return context.WithValue(ctx, noCacheKey{}, true)
 }
 
-func newCachedClient(remote grpcclient.SecretsClient, path string, retryAfter time.Duration) *cachedClient {
-	return &cachedClient{remote: remote, path: path, now: time.Now, retryAfter: retryAfter}
+func newCachedClient(remote grpcclient.SecretsClient, path string, retryAfter time.Duration, queue bool) *cachedClient {
+	return &cachedClient{remote: remote, path: path, now: time.Now, retryAfter: retryAfter, queue: queue}
 }
 
 // attach подключает проверенную копию разблокированной учётки. offlineNow — хранилище
@@ -214,13 +216,15 @@ func (c *cachedClient) write(
 	if c.snap == nil || noCache(ctx) {
 		return remote(ctx)
 	}
-	if c.skipRemote(ctx) || c.findOp(blindIndex) >= 0 {
+	if c.queue && (c.skipRemote(ctx) || c.findOp(blindIndex) >= 0) {
 		return c.enqueue(kind, blindIndex, data)
 	}
 	err := remote(ctx)
 	if isNetworkError(err) {
 		c.markOffline()
-		return c.enqueue(kind, blindIndex, data)
+		if c.queue {
+			return c.enqueue(kind, blindIndex, data)
+		}
 	}
 	if err != nil {
 		return err
