@@ -33,6 +33,9 @@ type SecretSummary struct {
 	Group     string
 	CreatedAt int64
 	UpdatedAt int64
+	// Status — StatusSynced, StatusPending (изменено без сети, не отправлено) или
+	// StatusConflict (не отправлено из-за конфликта).
+	Status string
 }
 
 // SecretList — список секретов: gomobile не передаёт срезы структур.
@@ -125,6 +128,7 @@ func (a *App) ListSecrets() (*SecretList, error) {
 			Group:     s.Group,
 			CreatedAt: unixMilli(s.CreatedAt),
 			UpdatedAt: unixMilli(s.UpdatedAt),
+			Status:    string(s.Status),
 		})
 	}
 	return result, nil

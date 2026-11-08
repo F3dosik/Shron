@@ -20,6 +20,10 @@ import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Lock
@@ -67,6 +71,7 @@ fun SecretsScreen(
     onAdd: () -> Unit,
     onOpen: (SecretRef) -> Unit,
     onSettings: () -> Unit,
+    onConflicts: () -> Unit,
 ) {
     // Список загружается при каждом показе экрана (после разблокировки, после добавления
     // секрета) и забывается при уходе.
@@ -75,6 +80,7 @@ fun SecretsScreen(
         onDispose(vm::forget)
     }
     var menu by remember { mutableStateOf(false) }
+    var confirmLogout by remember { mutableStateOf(false) }
     val coreState by vm.coreState.collectAsStateWithLifecycle()
 
     Scaffold(
@@ -96,7 +102,10 @@ fun SecretsScreen(
                             )
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.logout)) },
-                                onClick = { menu = false; vm.logout() },
+                                onClick = {
+                                    menu = false
+                                    if (coreState.pendingChanges > 0) confirmLogout = true else vm.logout()
+                                },
                             )
                         }
                     }
@@ -104,11 +113,8 @@ fun SecretsScreen(
             )
         },
         floatingActionButton = {
-            // Без сервера записи не изменить: кнопку добавления не показываем.
-            if (!coreState.offline) {
-                FloatingActionButton(onClick = onAdd) {
-                    Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.action_add_secret))
-                }
+            FloatingActionButton(onClick = onAdd) {
+                Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.action_add_secret))
             }
         },
     ) { padding ->
@@ -117,7 +123,8 @@ fun SecretsScreen(
                 .fillMaxSize()
                 .padding(padding),
         ) {
-            if (coreState.offline) OfflineBanner(coreState.syncedAt)
+            if (coreState.offline) OfflineBanner(coreState.syncedAt, coreState.pendingChanges)
+            if (coreState.conflicts > 0) ConflictsBanner(coreState.conflicts, onConflicts)
             PullToRefreshBox(
                 isRefreshing = vm.busy,
                 onRefresh = vm::refresh,
@@ -168,20 +175,39 @@ fun SecretsScreen(
             }
         }
     }
+
+    if (confirmLogout) {
+        AlertDialog(
+            onDismissRequest = { confirmLogout = false },
+            title = { Text(stringResource(R.string.logout_pending_title)) },
+            text = { Text(stringResource(R.string.logout_pending_text, coreState.pendingChanges)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmLogout = false
+                    vm.logout()
+                }) { Text(stringResource(R.string.logout_anyway), color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmLogout = false }) { Text(stringResource(R.string.cancel)) }
+            },
+        )
+    }
 }
 
 /**
  * Плашка «нет связи»: список и автозаполнение работают по копии на устройстве от
- * [syncedAt], изменения — только при связи с сервером. Потянуть список — проверить связь.
+ * [syncedAt], изменения копятся на телефоне ([pending]) и уйдут при подключении.
+ * Потянуть список — проверить связь.
  */
 @Composable
-private fun OfflineBanner(syncedAt: Long) {
-    val text = if (syncedAt > 0) {
+private fun OfflineBanner(syncedAt: Long, pending: Int) {
+    var text = if (syncedAt > 0) {
         val date = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(syncedAt))
         stringResource(R.string.offline_banner, date)
     } else {
         stringResource(R.string.offline_banner_no_date)
     }
+    if (pending > 0) text += "\n" + stringResource(R.string.offline_pending, pending)
     Surface(color = MaterialTheme.colorScheme.secondaryContainer, modifier = Modifier.fillMaxWidth()) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -306,10 +332,50 @@ private fun SecretRow(item: SecretItem, onClick: () -> Unit) {
         overlineContent = { Text(typeLabel(item.type)?.let { stringResource(it) } ?: item.type) },
         headlineContent = { Text(item.name) },
         supportingContent = item.metadata.takeIf { it.isNotBlank() }?.let { { Text(it, maxLines = 2) } },
-        trailingContent = if (item.updatedAt > 0) {
-            { Text(DateFormat.getDateInstance(DateFormat.SHORT).format(Date(item.updatedAt))) }
-        } else null,
+        trailingContent = {
+            Column(horizontalAlignment = Alignment.End) {
+                if (item.updatedAt > 0) Text(DateFormat.getDateInstance(DateFormat.SHORT).format(Date(item.updatedAt)))
+                when (item.status) {
+                    Mobile.StatusPending -> Text(
+                        stringResource(R.string.status_pending),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Mobile.StatusConflict -> Text(
+                        stringResource(R.string.status_conflict),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
+        },
     )
+}
+
+/** Плашка конфликтов: по нажатию — экран, где для каждой записи выбирается версия. */
+@Composable
+private fun ConflictsBanner(count: Int, onClick: () -> Unit) {
+    Surface(
+        color = MaterialTheme.colorScheme.errorContainer,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+        ) {
+            Icon(Icons.Filled.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.onErrorContainer)
+            Text(
+                stringResource(R.string.conflicts_banner, count),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onErrorContainer,
+                modifier = Modifier.weight(1f),
+            )
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onErrorContainer)
+        }
+    }
 }
 
 /** Сообщение на месте списка; LazyColumn — чтобы работал жест обновления. */

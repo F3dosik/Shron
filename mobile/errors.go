@@ -29,6 +29,8 @@ const (
 	CodeBadCertificate         = string(vault.CodeBadCertificate)
 	CodeNotSupported           = string(vault.CodeNotSupported)
 	CodeInternal               = string(vault.CodeInternal)
+	CodeNoConflict             = string(vault.CodeNoConflict)
+	CodeUnsyncedChanges        = string(vault.CodeUnsyncedChanges)
 
 	// CodeNotConfigured — не задан адрес сервера.
 	CodeNotConfigured = "NOT_CONFIGURED"
@@ -67,6 +69,8 @@ var messages = map[string]string{
 	CodeNotFound:               "Не найдено",
 	CodeAlreadyExists:          "Уже существует",
 	CodeUnavailable:            "Сервер недоступен",
+	CodeNoConflict:             "Конфликт уже разрешён",
+	CodeUnsyncedChanges:        "Есть изменения, не отправленные на сервер: дождитесь связи и разрешите конфликты",
 	CodeBadCertificate:         "Сертификат сервера не прошёл проверку — проверьте ca.crt и адрес",
 }
 

@@ -61,6 +61,10 @@ type Config struct {
 	SessionPath string
 	// CachePath — файл копии хранилища для работы без сервера; пустой — без копии.
 	CachePath string
+	// OfflineWrites — без сервера ставить изменения в очередь и отправлять их при
+	// подключении (с разрешением конфликтов, см. Conflicts). Без него без сервера
+	// хранилище только для чтения. Включать, только если интерфейс показывает конфликты.
+	OfflineWrites bool
 	// OfflineRetryAfter — сколько после неудачного обращения к серверу читать из копии,
 	// не обращаясь к нему; 0 — 30 секунд.
 	OfflineRetryAfter time.Duration
@@ -98,6 +102,8 @@ type SecretSummary struct {
 	Group     string
 	CreatedAt time.Time
 	UpdatedAt time.Time
+	// Status — отправлено ли изменение записи на сервер.
+	Status SyncStatus
 }
 
 // Vault — клиентское хранилище с состоянием разблокировки.
@@ -161,7 +167,7 @@ func Open(cfg Config) (*Vault, error) {
 		cfg:    cfg,
 		conn:   conn,
 		tokens: tokens,
-		cache:  newCachedClient(grpcclient.NewSecretsClient(pb.NewSecretsClient(conn)), cfg.CachePath, cfg.OfflineRetryAfter),
+		cache:  newCachedClient(grpcclient.NewSecretsClient(pb.NewSecretsClient(conn)), cfg.CachePath, cfg.OfflineRetryAfter, cfg.OfflineWrites),
 		pins:   pins,
 		login:  login,
 	}
@@ -496,6 +502,7 @@ func (v *Vault) ListSecrets(ctx context.Context) ([]SecretSummary, error) {
 				Group:     info.Group,
 				CreatedAt: info.CreatedAt,
 				UpdatedAt: info.UpdatedAt,
+				Status:    v.statusOf(svc, info.Name, info.Type),
 			})
 		}
 		return nil
@@ -594,6 +601,11 @@ func (v *Vault) DeleteSecret(ctx context.Context, name string, secretType domain
 // после смены должны войти заново.
 func (v *Vault) ChangePassword(ctx context.Context, oldPassword, newPassword string, kdf domain.KDFParams) error {
 	// Перешифровать нужно ровно то, что на сервере, а не копию на устройстве.
+	// Сначала — отправить изменения, сделанные без сети: после смены пароля их уже не
+	// расшифровать.
+	if err := v.flushPending(ctx); err != nil {
+		return err
+	}
 	err := v.withSecrets(withoutCache(ctx), bulkTimeout, func(ctx context.Context, svc service.SecretsService) error {
 		reencrypt := func(newMasterKey []byte) ([]domain.ReencryptedSecret, error) {
 			return svc.Reencrypt(ctx, newMasterKey)
@@ -658,6 +670,27 @@ func (v *Vault) DeleteAccount(ctx context.Context, password string) error {
 	return nil
 }
 
+// flushPending отправляет очередь изменений; если что-то осталось (нет сети или
+// конфликт), возвращает ErrUnsyncedChanges.
+func (v *Vault) flushPending(ctx context.Context) error {
+	v.mu.Lock()
+	if v.secrets == nil {
+		v.mu.Unlock()
+		return ErrLocked
+	}
+	v.cache.retryAt = time.Time{}
+	v.mu.Unlock()
+	// Пустая операция: withSecrets сам отправит очередь.
+	err := v.withSecrets(ctx, v.cfg.RequestTimeout, func(context.Context, service.SecretsService) error { return nil })
+	if err != nil {
+		return err
+	}
+	if pending, _ := v.PendingChanges(); pending > 0 {
+		return ErrUnsyncedChanges
+	}
+	return nil
+}
+
 // removeCache удаляет копию на устройстве (выход, удаление учётки).
 func (v *Vault) removeCache() {
 	if v.cfg.CachePath != "" {
@@ -686,6 +719,7 @@ func (v *Vault) withSecrets(
 		v.notifyLock(LockSessionExpired)
 		return ErrSessionExpired
 	}
+	v.syncLocked(ctx)
 
 	err := op(ctx, v.secrets)
 	if errors.Is(err, domain.ErrInvalidCredentials) {
