@@ -28,6 +28,9 @@
   let editing: Secret | null = $state(null)
   let dialog: '' | 'delete-secret' = $state('')
   let notice = $state('')
+  // Сервер недоступен: список — из копии на этом компьютере (только чтение).
+  let offline = $state(false)
+  let syncedAt = $state(0)
   let error = $state('')
   let noticeTimer: ReturnType<typeof setTimeout> | undefined
 
@@ -85,6 +88,26 @@
     } catch (e) {
       handleError(e)
     }
+    await refreshOffline()
+  }
+
+  async function refreshOffline() {
+    try {
+      const st = await api.getState()
+      offline = st.offline
+      syncedAt = st.syncedAt
+    } catch {
+      // Состояние не критично: плашка обновится при следующем действии.
+    }
+  }
+
+  async function checkConnection() {
+    try {
+      await api.retryServer()
+    } catch {
+      // ничего: reload покажет ошибку, если она есть
+    }
+    await reload()
   }
 
   function showNotice(text: string) {
@@ -114,6 +137,15 @@
 
 <div class="layout">
   <aside>
+    {#if offline}
+      <div class="offline" role="status">
+        <span>
+          Нет связи с сервером. Показана копия на этом компьютере{#if syncedAt} от {new Date(syncedAt).toLocaleString('ru-RU', { dateStyle: 'medium', timeStyle: 'short' })}{/if}.
+          Изменения недоступны, пока связь не вернётся.
+        </span>
+        <button onclick={checkConnection}>Проверить связь</button>
+      </div>
+    {/if}
     <div class="toolbar">
       <div class="search">
         <Search size={15} aria-hidden="true" />
@@ -236,6 +268,7 @@
   aside { width: 300px; min-width: 240px; display: flex; flex-direction: column; background: var(--panel); border-right: 1px solid var(--border); }
   main { flex: 1; overflow: auto; }
   .toolbar { display: flex; gap: 8px; padding: 12px; }
+  .offline { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; padding: 10px 12px; font-size: 13px; background: var(--panel-2); border-bottom: 1px solid var(--border); color: var(--muted); }
   .search { flex: 1; display: flex; align-items: center; gap: 6px; padding: 0 10px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--panel-2); color: var(--muted); }
   .search:focus-within { outline: 2px solid var(--accent); outline-offset: -1px; }
   .search input { border: none; background: none; padding: 8px 0; }

@@ -4,10 +4,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import io.github.f3dosik.shron.ShronApplication
-import io.github.f3dosik.shron.core.CoreState
 import io.github.f3dosik.shron.mobile.SecretSummary
 import io.github.f3dosik.shron.ui.common.CoreViewModel
-import kotlinx.coroutines.flow.StateFlow
 
 /** Строка списка секретов: копия SecretSummary, чтобы не держать ссылки на объекты Go. */
 data class SecretItem(
@@ -58,8 +56,6 @@ class SecretsViewModel(app: ShronApplication) : CoreViewModel(app) {
     var items by mutableStateOf<List<SecretItem>?>(null)
         private set
 
-    /** Состояние ядра — чтобы показать, что сервер недоступен и список из копии. */
-    val coreState: StateFlow<CoreState> get() = core.state
     var query by mutableStateOf("")
     var typeFilter by mutableStateOf<String?>(null)
 

@@ -57,6 +57,7 @@ export const api = {
   unlock: (password: string) => call(Go.Unlock(password)),
   acceptKdfChange: (login: string) => call(Go.AcceptKDFChange(login)),
   lock: () => call(Go.Lock()),
+  retryServer: () => call(Go.RetryServer()),
   changePassword: (oldPw: string, newPw: string, kdfTime: number, kdfMemoryMiB: number) =>
     call(Go.ChangePassword(oldPw, newPw, kdfTime, kdfMemoryMiB)),
   logout: (all: boolean) => call(Go.Logout(all)),

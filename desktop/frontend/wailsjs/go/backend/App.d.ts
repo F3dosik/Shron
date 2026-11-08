@@ -52,6 +52,8 @@ export function Logout(arg1:boolean):Promise<void>;
 
 export function Register(arg1:string,arg2:string):Promise<void>;
 
+export function RetryServer():Promise<void>;
+
 export function SaveSecret(arg1:backend.SecretInput,arg2:boolean):Promise<void>;
 
 export function SaveSettings(arg1:string,arg2:string,arg3:boolean,arg4:number):Promise<void>;
