@@ -52,7 +52,13 @@ class ShronAutofillService : AutofillService() {
             return
         }
 
-        val scan = Scan()
+        // Поле, на котором вызвано автозаполнение: форма строится от него (см. parseLoginForm).
+        val focusedId = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            request.fillContexts.lastOrNull()?.focusedId
+        } else {
+            null
+        }
+        val scan = Scan(focusedId)
         for (i in 0 until structure.windowNodeCount) scan.visit(structure.getWindowNodeAt(i).rootViewNode)
         val form = parseLoginForm(scan.fields)
         if (form == null) {
@@ -86,7 +92,7 @@ class ShronAutofillService : AutofillService() {
     }
 
     /** Поля формы и домен сайта (для браузеров) из структуры экрана. */
-    private class Scan {
+    private class Scan(private val focusedId: AutofillId?) {
         val fields = mutableListOf<FormField<AutofillId>>()
         var webDomain: String? = null
 
@@ -101,6 +107,7 @@ class ShronAutofillService : AutofillService() {
                     idEntry = node.idEntry,
                     hint = node.hint,
                     html = node.htmlInfo?.attributes?.associate { it.first.lowercase() to it.second }.orEmpty(),
+                    focused = if (focusedId != null) id == focusedId else node.isFocused,
                 )
             }
             for (i in 0 until node.childCount) visit(node.getChildAt(i))

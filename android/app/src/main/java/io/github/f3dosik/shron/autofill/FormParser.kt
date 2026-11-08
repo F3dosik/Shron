@@ -17,6 +17,8 @@ data class FormField<T>(
     val hint: String? = null,
     /** Атрибуты HTML-элемента на сайтах: type, name, autocomplete, id. */
     val html: Map<String, String> = emptyMap(),
+    /** Поле в фокусе: на нём пользователь вызвал автозаполнение. */
+    val focused: Boolean = false,
 )
 
 /** Найденные поля входа: хотя бы одно из двух. */
@@ -81,11 +83,42 @@ fun <T> FormField<T>.isUsername(): Boolean {
 }
 
 /**
- * Находит поля логина и пароля среди полей экрана в порядке их следования. Логин — поле,
- * явно помеченное как логин, иначе ближайшее текстовое поле перед паролем. Форма без поля
- * пароля и без явного поля логина — не форма входа (поиск, адрес, комментарий).
+ * Скрытое служебное поле страницы: type=hidden или aria-hidden. Браузеры передают такие
+ * поля как видимые, а Google держит на шаге почты скрытый пароль, а на шаге пароля —
+ * скрытую почту.
  */
-fun <T> parseLoginForm(fields: List<FormField<T>>): LoginForm<T>? {
+private fun <T> FormField<T>.isHiddenHtml() =
+    html["type"]?.lowercase() == "hidden" || html["aria-hidden"]?.lowercase() == "true"
+
+/**
+ * Находит поля логина и пароля среди полей экрана в порядке их следования.
+ *
+ * Если известно поле в фокусе и это логин или пароль, форма строится от него: система
+ * показывает подсказки только для полей, которые есть в наборе данных, поэтому поле в
+ * фокусе обязано в него попасть. Для пароля в фокусе логин — ближайшее поле логина перед
+ * ним, иначе ближайшее текстовое поле перед ним; для логина в фокусе пароль — первое поле
+ * пароля после него.
+ *
+ * Иначе логин — поле, явно помеченное как логин, иначе ближайшее текстовое поле перед
+ * паролем. Форма без поля пароля и без явного поля логина — не форма входа (поиск, адрес,
+ * комментарий). Скрытые HTML-поля не учитываются, кроме поля в фокусе.
+ */
+fun <T> parseLoginForm(all: List<FormField<T>>): LoginForm<T>? {
+    val fields = all.filter { it.focused || !it.isHiddenHtml() }
+    val focusedIndex = fields.indexOfFirst { it.focused }
+    if (focusedIndex >= 0) {
+        val focused = fields[focusedIndex]
+        if (focused.isPassword()) {
+            val before = fields.subList(0, focusedIndex)
+            val username = before.lastOrNull { it.isUsername() } ?: before.lastOrNull { !it.isPassword() }
+            return LoginForm(username?.id, focused.id)
+        }
+        if (focused.isUsername()) {
+            val password = fields.subList(focusedIndex + 1, fields.size).firstOrNull { it.isPassword() }
+            return LoginForm(focused.id, password?.id)
+        }
+    }
+
     val passwordIndex = fields.indexOfFirst { it.isPassword() }
     val explicitUsername = fields.firstOrNull { it.isUsername() }
     if (passwordIndex < 0) {

@@ -85,6 +85,53 @@ class FormParserTest {
     }
 
     @Test
+    fun `password step of Google sign-in uses the focused password`() {
+        // Перед видимым паролем Google держит скрытые почту и пароль.
+        val form = parseLoginForm(
+            listOf(
+                FormField("hiddenEmail", html = mapOf("type" to "email", "name" to "identifier")),
+                FormField("hiddenPassword", html = mapOf("type" to "password", "name" to "hiddenPassword")),
+                FormField("p", html = mapOf("type" to "password", "name" to "Passwd"), focused = true),
+            ),
+        )
+        assertEquals(LoginForm("hiddenEmail", "p"), form)
+    }
+
+    @Test
+    fun `focused login takes the password after it`() {
+        val form = parseLoginForm(
+            listOf(
+                FormField("old", inputType = textPassword),
+                FormField("u", inputType = email, focused = true),
+                FormField("p", inputType = textPassword),
+            ),
+        )
+        assertEquals(LoginForm("u", "p"), form)
+    }
+
+    @Test
+    fun `hidden html fields are skipped`() {
+        val form = parseLoginForm(
+            listOf(
+                FormField("u", inputType = email, focused = true),
+                FormField("h", html = mapOf("type" to "password", "aria-hidden" to "true")),
+            ),
+        )
+        assertEquals(LoginForm("u", null), form)
+    }
+
+    @Test
+    fun `focused field that is not a login falls back to the whole form`() {
+        val form = parseLoginForm(
+            listOf(
+                FormField("name", inputType = plainText, focused = true),
+                FormField("p", inputType = webPassword),
+            ),
+        )
+        assertEquals(LoginForm("name", "p"), form)
+    }
+
+    @Test
     fun `forms without login fields are ignored`() {
         assertNull(parseLoginForm(listOf(FormField("q", inputType = plainText, hint = "Поиск"))))
         assertNull(parseLoginForm(emptyList<FormField<String>>()))
